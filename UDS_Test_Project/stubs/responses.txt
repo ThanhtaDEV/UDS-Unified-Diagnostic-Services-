@@ -1,0 +1,4 @@
+# Đáp án tương ứng từng dòng bên requests.txt
+50 03 00 32 01 F4   # Đáp án cho SESSION 03 (OK)
+7F 10 22            # Đáp án cho SESSION 02 (Giả sử ECU từ chối: Conditions Not Correct)
+51 01               # Đáp án cho RESET 01 (OK)

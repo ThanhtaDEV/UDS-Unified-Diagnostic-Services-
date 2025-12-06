@@ -1,0 +1,5 @@
+# Kịch bản Test FOTA cơ bản
+SESSION 03      # 1. Chuyển sang Extended Session
+SESSION 02      # 2. Chuyển sang Programming Session (Thử sai luồng)
+RESET 01        # 3. Hard Reset
+# SECURITY 01   # (Để dành cho bài sau)
