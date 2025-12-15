@@ -12,14 +12,14 @@
 class ITransport {
 public:
     // Destructor ảo: Cực kỳ quan trọng để tránh rò rỉ bộ nhớ khi delete đối tượng con qua con trỏ cha
-    virtual ~ITransport() {}
+    virtual ~ITransport() = default;
 
     /**
      * Hàm gửi dữ liệu (Pure Virtual)
      * @param data: Chuỗi byte cần gửi (ví dụ: {0x10, 0x03})
      * @return: true nếu gửi thành công, false nếu thất bại
      */
-    virtual void send(const UdsMessage& msg) = 0;
+    virtual bool send(const UdsMessage& msg) = 0;
 
     /**
      * Hàm nhận dữ liệu (Pure Virtual)

@@ -40,6 +40,8 @@ public:
 
     virtual ~UdsClient();
 
+    bool unlockSecurity(int level);
+
     // Hàm nội bộ gửi và nhận (sẽ làm ở Bước 3.2)
     UdsResponse sendAndWait(const UdsMessage& req); 
 
