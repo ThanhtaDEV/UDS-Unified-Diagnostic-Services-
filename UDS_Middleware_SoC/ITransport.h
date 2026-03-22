@@ -11,7 +11,7 @@
  */
 class ITransport {
 public:
-    // Destructor ảo: Cực kỳ quan trọng để tránh rò rỉ bộ nhớ khi delete đối tượng con qua con trỏ cha
+    // Destructor ảo: "Cực kỳ quan trọng" để tránh rò rỉ bộ nhớ khi delete đối tượng con qua con trỏ cha
     virtual ~ITransport() = default;
 
     /**

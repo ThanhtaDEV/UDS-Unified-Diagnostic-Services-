@@ -8,7 +8,7 @@
 
 class SocketCanTransport : public ITransport {
 private:
-    int socketFd;	//File Descriptor quản lý kết nối socket
+    int socketFd;	// File Descriptor quản lý kết nối socket
     std::string ifName; // can0 or vcan0
     uint32_t txId;	// Client -> ECU
     uint32_t rxId;	// ECU -> Client
@@ -27,12 +27,15 @@ public:
     // Khởi tạo kết nối (mở socket, bind)
     bool init();
 
+    // Kiểm tra socket có hợp lệ không
+    bool isValid() const { return socketFd >= 0; }
+
     // Đóng kết nối
     void closeSocket();
 
     // Hiện thực hoá Interface Transport
-    bool send(const UdsMessage& msg) override; 				//gửi message xuống kernel
-    bool receive(std::vector<uint8_t>& buffer, int timeoutMs) override;  //nhận message từ kernel
+    bool send(const UdsMessage& msg) override; 				 // gửi message xuống kernel
+    bool receive(std::vector<uint8_t>& buffer, int timeoutMs) override;  // nhận message từ kernel
 };
 
 #endif // SOCKET_CAN_TRANSPORT_H

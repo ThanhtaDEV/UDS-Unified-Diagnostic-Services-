@@ -16,7 +16,7 @@ private:
 public:
     // Constructor: Nhận raw bytes từ Transport và tự động parse
     explicit UdsResponse(const std::vector<uint8_t>& rawData);
-    //UdsResponse(uint8_t id, const std::vector<uint8_t>& data);
+    // UdsResponse(uint8_t id, const std::vector<uint8_t>& data);
     // Kiểm tra nhanh xem có OK không
     bool isPositive() const;
 

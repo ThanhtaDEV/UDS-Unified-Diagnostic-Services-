@@ -22,7 +22,7 @@ public:
     uint8_t getNRC() const;
 
     // Hàm tĩnh giúp chuyển đổi Hex sang Text (Helper)
-    static std::string getNrcDescription(uint8_t nrc);
+    static std::string getNrcDescription(uint8_t nrcCode);
 };
 
 #endif // UDS_EXCEPTION_H
