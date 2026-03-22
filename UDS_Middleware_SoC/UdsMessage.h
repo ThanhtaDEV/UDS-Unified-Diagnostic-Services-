@@ -32,6 +32,10 @@ public:
 
     // Getter lấy độ dài payload (hữu ích để tính Data Length Code - DLC)
     size_t getPayloadSize() const;
+
+    // Lấy Payload dạng tham chiếu (Reference) để chỉnh sửa trực tiếp
+    // Hàm này cần thiết cho: append32BitToVector(msg.getPayloadVector(), val)
+    std::vector<uint8_t>& getPayloadVector();
 };
 
 #endif // UDS_MESSAGE_H
