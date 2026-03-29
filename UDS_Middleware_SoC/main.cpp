@@ -145,7 +145,7 @@ int main(int argc, char* argv[]) {
 	    {
 		std::string zipPath = "";
     		std::string targetDir = "Firmware";
-		std::cout << "[Main] Đang quét tìm file .zip trong thư mục " << targetDir << "...\n";
+		std::cout << "[Main] Scanning for .zip files in directory: " << targetDir << "...\n";
 
 		// Kiểm tra xem thư mục có tồn tại không
     		if (std::filesystem::exists(targetDir)) {
@@ -158,17 +158,17 @@ int main(int argc, char* argv[]) {
             		}
         	    }
     		} else {
-        	    std::cout << "[LỖI] Thư mục '" << targetDir << "' không tồn tại!\n";
+        	    std::cout << "[ERROR] Directory '" << targetDir << "' does not exist!\n";
         	    break;
     		}
 
 		// Nếu quét xong mà không thấy file zip nào
     		if (zipPath.empty()) {
-        	    std::cout << "[LỖI] Không tìm thấy file .zip nào trong thư mục 'Firmware/'!\n";
+        	    std::cout << "[ERROR] No .zip files found in direction 'Firmware/'!\n";
         	    break;
     		}
 
-    		std::cout << "[Main] Đã tự động chọn Firmware: " << zipPath << "\n";
+    		std::cout << "[Main] Automatically selected Firmware: " << zipPath << "\n";
 
                 fotaApp.startRequestDownloadProcess(zipPath);
                 break;
@@ -177,7 +177,7 @@ int main(int argc, char* argv[]) {
 	    case 't':
 	    case 'T':
 		if (!fotaApp.isProcessing()) {
-                    std::cout << "[Main] Bắt đầu truyền dữ liệu (0x36 Transfer Data)...\n";
+                    std::cout << "[Main] Starting data transfer (0x36 Transfer Data)...\n";
                     // Gọi hàm xử lý 0x36 bên trong FotaManager
                     fotaApp.startTransferDataProcess();
                 } else {
