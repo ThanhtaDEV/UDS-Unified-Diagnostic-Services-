@@ -7,10 +7,13 @@
 #include <csignal>
 #include <chrono>
 #include <filesystem>
+#include <fstream>
+#include <curl/curl.h>
 
 #include "FOTA_Manager.h"
 
 namespace fs = std::filesystem;
+using namespace std;
 
 // =================================================
 // 1. KHÔNG GIAN ĐỒNG BỘ HÓA (SYNCHRONIZATION SPACE)
@@ -26,10 +29,17 @@ std::mutex g_canMutex;
 std::mutex g_aiWaitMutex;
 std::condition_variable g_aiCv;
 
-const std::string FIRMWARE_DIR = "Firmware/";
-
 // Trỏ toàn cục trỏ đến FotaManager (nhận tham sớ init, không nhận object)
 FotaManager* g_fotaManager = nullptr;
+
+// Cấu hình thư mục
+const std::string FIRMWARE_DIR = "Firmware/";
+const string LAST_FILE_TXT = FIRMWARE_DIR + "last_downloaded.txt";
+
+// Cấu hình Web API
+const string SERVER_URL = "http://192.168.100.120:8000";
+const string CHECK_API = SERVER_URL + "/api/firmware/check/";
+const string DOWNLOAD_API = SERVER_URL + "/api/firmware/latest/";
 
 // =============================================
 // 2. CÁC HÀM HỖ TRỢ LÕI (CORE HELPER FUNCTIONS)
@@ -62,8 +72,47 @@ void waitFotaStep(FotaManager* fotaApp) {
     }
 }
 
+// HELPERS CHO CÁC TÁC VỤ WEB & FILE
+size_t WriteStringCallback(void *contents, size_t size, size_t nmemb, string *userp) {
+    userp->append((char*)contents, size * nmemb);
+    return size * nmemb;
+}
+
+size_t WriteFileCallback(void *ptr, size_t size, size_t nmemb, FILE *stream) {
+    return fwrite(ptr, size, nmemb, stream);
+}
+
+string getLocalFilename() {
+    ifstream file(LAST_FILE_TXT);
+    if (file.is_open()) {
+        string filename;
+        getline(file, filename);
+        file.close();
+        return filename;
+    }
+    return "";
+}
+
+void updateLocalFilename(const string& filename) {
+    ofstream file(LAST_FILE_TXT);
+    if (file.is_open()) {
+        file << filename;
+        file.close();
+    }
+}
+
+string extractJsonValue(const string& json, const string& key) {
+    string searchKey = "\"" + key + "\": \"";
+    size_t start = json.find(searchKey);
+    if (start == string::npos) return "";
+    start += searchKey.length();
+    size_t end = json.find("\"", start);
+    if (end == string::npos) return "";
+    return json.substr(start, end - start);
+}
+
 // ==============================
-// 3. LUỒNG TÁC VỤ PHỤ: AI WORKER
+// 3. LUỒNG TÁC VỤ 1: AI WORKER
 // ==============================
 /*
 void aiWorkerThread() {
@@ -87,9 +136,76 @@ void aiWorkerThread() {
 }
 */
 
-// ==================================
-// 4. LUỒNG TÁC VỤ CHÍNH: FOTA DAEMON
-// ==================================
+// ======================================================
+// 4. LUỒNG TÁC VỤ 2: QUÉT SERVER TRỰC TUYẾN (WEB POLLER)
+// ======================================================
+void webPollerThread() {
+    std::cout << "[Web Poller] Starting server monitoring: " << SERVER_URL << "\n";
+    if (!fs::exists(FIRMWARE_DIR)) fs::create_directory(FIRMWARE_DIR);
+    while (g_keepRunning) {
+	// Sleep ngay lập tức nếu FOTA Flashing
+	{
+            std::unique_lock<std::mutex> lock(g_aiWaitMutex);
+            g_aiCv.wait(lock, []{ return !g_fotaInProgress.load() || !g_keepRunning.load(); });
+        }
+        if (!g_keepRunning) break;
+
+	string local_filename = getLocalFilename();
+        CURL *curl = curl_easy_init();
+
+	if (curl) {
+            string readBuffer;
+            curl_easy_setopt(curl, CURLOPT_URL, CHECK_API.c_str());
+            curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteStringCallback);
+            curl_easy_setopt(curl, CURLOPT_WRITEDATA, &readBuffer);
+            curl_easy_setopt(curl, CURLOPT_TIMEOUT, 5L);
+
+            CURLcode res = curl_easy_perform(curl);
+
+            if (res == CURLE_OK && readBuffer.find("\"has_firmware\": true") != string::npos) {
+                string latest_filename = extractJsonValue(readBuffer, "filename");
+
+                if (latest_filename != local_filename && !latest_filename.empty()) {
+                    cout << "\n[Web Poller] NEW FILE DETECTED ON SERVER: " << latest_filename << endl;
+
+                    // [AN TOÀN FILE]: Đặt đuôi .tmp để FOTA Thread không nhìn thấy
+                    string tmp_path = FIRMWARE_DIR + latest_filename + ".tmp";
+                    string final_path = FIRMWARE_DIR + latest_filename;
+
+                    FILE *fp = fopen(tmp_path.c_str(), "wb");
+                    if (fp) {
+                        cout << "[Web Poller] Downloading..." << endl;
+                        curl_easy_setopt(curl, CURLOPT_URL, DOWNLOAD_API.c_str());
+                        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteFileCallback);
+                        curl_easy_setopt(curl, CURLOPT_WRITEDATA, fp);
+                        curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L); 
+
+                        res = curl_easy_perform(curl);
+                        fclose(fp);
+
+                        if (res == CURLE_OK) {
+                            // [BÓP CÒ]: Tải xong 100%, đổi tên .tmp thành .zip
+                            fs::rename(tmp_path, final_path);
+                            cout << "[Web Poller] DOWNLOAD SUCCESSFUL! Renamed to: " << final_path << endl;
+                            updateLocalFilename(latest_filename);
+                        } else {
+                            // Tải lỗi (rớt mạng) -> Xóa file rác
+                            fs::remove(tmp_path);
+                            cerr << "[Web Poller] Download error. Will retry later." << endl;
+                        }
+                    }
+                }
+            }
+            curl_easy_cleanup(curl);
+        }
+
+        std::this_thread::sleep_for(std::chrono::seconds(5));
+    }
+}
+
+// ==============================
+// 5. LUỒNG TÁC VỤ 3: FOTA DAEMON
+// ==============================
 void fotaWorkerThread(FotaManager* fotaApp) {
     std::cout << "[FOTA Worker] Starting automatic Monitoring...\n";
 
@@ -201,7 +317,7 @@ void fotaWorkerThread(FotaManager* fotaApp) {
 }
 
 // =============================
-// 5. TRUNG TÂM KHỞI CHẠY (MAIN)
+// 6. TRUNG TÂM KHỞI CHẠY (MAIN)
 // =============================
 int main(int argc, char* argv[]) {
     // Đăng ký bắt cờ tín hiệu từ Hệ điều hành
@@ -222,6 +338,7 @@ int main(int argc, char* argv[]) {
     // luồng AI và luồng FOTA chạy song song ở chế độ nền.
     //std::thread aiThread(aiWorkerThread);
     std::thread fotaThread(fotaWorkerThread, &fotaApp);
+    std::thread webThread(webPollerThread);
 
     // Luồng chính (main) lui về hậu trường, ngủ yên ở đây để giữ cho chương trình sống.
     // Nếu main() thoát, toàn bộ app sẽ bị hủy.
@@ -232,6 +349,7 @@ int main(int argc, char* argv[]) {
     // Khi hệ thống nhận lệnh tắt, dùng join() đợi các luồng phụ dọn dẹp xong
     //if (aiThread.joinable()) aiThread.join();
     if (fotaThread.joinable()) fotaThread.join();
+    if (webThread.joinable()) webThread.join();
 
     std::cout << "[Master] Application Exited Successfully.\n";
     return 0;
