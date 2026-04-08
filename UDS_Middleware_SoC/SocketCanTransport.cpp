@@ -11,7 +11,7 @@
 #include <iomanip>
 
 SocketCanTransport::SocketCanTransport(const std::string& interfaceName, uint32_t transmitId, uint32_t receiveId)
-    : ifName(interfaceName), txId(transmitId), rxId(receiveId), socketFd(-1) 
+    : ifName(interfaceName), txId(transmitId), rxId(receiveId), socketFd(-1)
 {
     init();
 }
