@@ -37,7 +37,7 @@ const std::string FIRMWARE_DIR = "Firmware/";
 const string LAST_FILE_TXT = FIRMWARE_DIR + "last_downloaded.txt";
 
 // Cấu hình Web API
-const string SERVER_URL = "http://192.168.100.120:8000";
+const string SERVER_URL = "http://172.20.10.13:8000";
 const string CHECK_API = SERVER_URL + "/api/firmware/check/";
 const string DOWNLOAD_API = SERVER_URL + "/api/firmware/latest/";
 

@@ -336,8 +336,9 @@ uint32_t UdsClient::requestDownload(uint32_t address, uint32_t size) {
 
 // Service 0x36: Transfer Data
 bool UdsClient::transferData(uint8_t blockSequenceCounter, const std::vector<uint8_t>& dataChunk) {
-    std::cout << "[UDS_Client - 0x36] TransferData (Block: 0x%X" << std::hex << (int)blockSequenceCounter << ", Size: "
-							    << std::dec << dataChunk.size() << "bytes)\n";
+    std::cout << "[UDS_Client - 0x36] TransferData (Block: 0x"
+	      << std::hex << std::uppercase << std::setw(2) << std::setfill('0') << (int)blockSequenceCounter
+	      << std::dec << ", Size: " << dataChunk.size() << "bytes)\n";
     std::vector<uint8_t> payload;
     payload.push_back(blockSequenceCounter); // 1 byte Block Sequence Counter nằm đầu tiên
     payload.insert(payload.end(), dataChunk.begin(), dataChunk.end());	// Nối toàn bộ mảng dataChunk (Firmware) vào phía sau Block
