@@ -45,7 +45,7 @@ bool SocketCanTransport::init() {
     struct ifreq ifr;
     std::memset(&ifr, 0, sizeof(ifr));
     std::strncpy(ifr.ifr_name, ifName.c_str(), IFNAMSIZ - 1);
-    
+
     if (ioctl(socketFd, SIOCGIFINDEX, &ifr) < 0) {
         perror("[Transport] Interface lookup failed (Check if interface exists/up)");
         closeSocket();
@@ -79,7 +79,7 @@ bool SocketCanTransport::send(const UdsMessage& msg) {
     std::vector<uint8_t> data = msg.getRawBytes();
 
     // LOGGING: In ra data ứng dụng (Application Data)
-    // (Ta không thấy frame CAN nhỏ ở đây vì Kernel đã làm ngầm)
+    // (Không thấy frame CAN nhỏ ở đây vì Kernel đã làm ngầm)
     std::cout << "[ISO-TP Tx] Len: " << std::dec << data.size() << " | Data: [ ";
     for (const auto& byte : data) {
         std::cout << std::hex << std::setw(2) << std::setfill('0') << (int)byte << " ";
@@ -132,7 +132,7 @@ bool SocketCanTransport::receive(std::vector<uint8_t>& buffer, int timeoutMs) {
     }
     std::cout << "]" << std::dec << std::endl;
 
-    // D. Copy dữ liệu ra buffer kết quả
+    // Copy dữ liệu ra buffer kết quả
     buffer.assign(tempBuf, tempBuf + nbytes);
     return true;
 }

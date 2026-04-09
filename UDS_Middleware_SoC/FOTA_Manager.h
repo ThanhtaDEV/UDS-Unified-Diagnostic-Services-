@@ -18,9 +18,9 @@ public:
     ~FotaManager();
     /**
      * @brief Khởi tạo kết nối CAN và các thành phần
-     * @param interfaceName Tên cổng CAN (vd: "can0")
-     * @param txId CAN ID gửi đi (SoC -> VCU, vd: 0x7E0)
-     * @param rxId CAN ID nhận về (VCU -> SoC, vd: 0x7E8)
+     * @param interfaceName Tên cổng CAN (can0)
+     * @param txId CAN ID gửi đi (SoC -> VCU, 0x7E0)
+     * @param rxId CAN ID nhận về (VCU -> SoC, 0x7E8)
      */
     bool initialize(const std::string& interfaceName, uint32_t txId, uint32_t rxId);
 
@@ -45,6 +45,9 @@ public:
      */
     void startTransferDataProcess();
 
+    /**
+     * @brief Sau khi nhận phản hồi từ VCU về Final Block, lệnh này sẽ được gửi
+     */
     void startTransferExitProcess();
 
     /**
@@ -108,7 +111,7 @@ private:
 
     void runRequestDownloadTask(); // 0x34
     void runTransferDataTask();    // 0x36
-    void runTransferExitTask(); // 0x37
+    void runTransferExitTask();    // 0x37
 };
 
 #endif // FOTA_MANAGER_H

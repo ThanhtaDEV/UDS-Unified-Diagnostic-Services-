@@ -7,7 +7,7 @@
 
 class UdsMessage {
 private:
-    uint8_t sid;                     // Service ID (ví dụ: 0x10, 0x11, 0x3E...)
+    uint8_t sid;                     // Service ID (0x10, 0x11, 0x3E...)
     std::vector<uint8_t> payload;    // Dữ liệu đi kèm (tham số)
 
 public:

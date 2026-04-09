@@ -19,7 +19,7 @@ UdsResponse::UdsResponse(const std::vector<uint8_t>& rawData) {
         // Cần ít nhất 3 byte để đọc được mã lỗi
         if (rawData.size() >= 3) {
             sid = rawData[1]; // SID gốc mà mình đã gửi đi
-            nrc = rawData[2]; // Mã lỗi (Ví dụ: 0x11, 0x12, 0x33...)
+            nrc = rawData[2]; // Mã lỗi (0x11, 0x12, 0x33...)
         } else {
             sid = 0;
             nrc = 0xFF; // Gói tin lỗi bị cụt (Malformed)
@@ -30,7 +30,7 @@ UdsResponse::UdsResponse(const std::vector<uint8_t>& rawData) {
         // 3. Trường hợp Positive Response (Thành công)
         // Cấu trúc: [SID phản hồi] [Data Byte 1] [Data Byte 2]...
         _isPositive = true;
-        sid = rawData[0]; // Byte đầu là SID (thường là Request SID + 0x40)
+        sid = rawData[0]; // Byte đầu là SID (Request SID + 0x40)
         nrc = 0x00;       // 0x00 đại diện cho Success (không có lỗi)
 
         // Tách Payload: Copy từ byte thứ 2 trở đi vào vector data

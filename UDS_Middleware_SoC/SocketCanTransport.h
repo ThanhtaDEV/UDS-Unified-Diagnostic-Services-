@@ -16,9 +16,9 @@ private:
 public:
     /**
      * @brief Constructor
-     * @param interfaceName: Tên card mạng CAN (vd: "can0")
-     * @param transmitId: ID gửi đi (ECU Request ID, vd: 0x7E0)
-     * @param receiveId: ID nhận về (ECU Response ID, vd: 0x7E8)
+     * @param interfaceName: Tên card mạng CAN (can0)
+     * @param transmitId: ID gửi đi (ECU Request ID, 0x7E0)
+     * @param receiveId: ID nhận về (ECU Response ID, 0x7E8)
      */
     SocketCanTransport(const std::string& interfaceName, uint32_t transmitId, uint32_t receiveId);
 

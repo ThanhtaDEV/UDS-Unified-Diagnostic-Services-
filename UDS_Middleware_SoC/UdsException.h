@@ -8,7 +8,7 @@
 
 class UdsException : public std::exception {
 private:
-    uint8_t nrc;        // Mã lỗi gốc (ví dụ 0x7F, 0x33...)
+    uint8_t nrc;        // Mã lỗi gốc (0x7F, 0x33...)
     std::string message; // Chuỗi thông báo lỗi (đã map từ nrc)
 
 public:
