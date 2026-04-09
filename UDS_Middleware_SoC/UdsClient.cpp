@@ -2,10 +2,10 @@
 #include "UdsConstants.h"
 
 #include <iostream>
-#include <iomanip> // Để in hex đẹp hơn nếu cần debug
+#include <iomanip> // Để in hex, dễ debug
 
 // Constructor & Dependency Injection
-// Nhận vào Interface Transport để sau này dễ dàng thay thế (Mock -> SocketCAN)
+// Nhận vào Interface Transport dễ dàng thay thế (Mock -> SocketCAN)
 UdsClient::UdsClient(ITransport* trans, SecurityManager* sec, int timeoutMs)
     : transport(trans), security(sec), p2_timeout(timeoutMs)
 {
@@ -117,15 +117,17 @@ UdsResponse UdsClient::requestSession(uint8_t sessionType) {
             std::cout << "[UDS_Client - 0x10]  - P2 (Max Response Time): " << ((data[1] << 8) | data[2]) << "ms" << std::endl;
             std::cout << "[UDS_Client - 0x10]  - P2* (Max Busy Time): " << p2_star_val << " (unit 10ms)" << std::endl;
 	    // CẬP NHẬT TIMEOUT CHO CLIENT
-            // Code VCU bạn gửi: 0x01F4 (500) -> chú thích là 5000ms => đơn vị là 10ms
+            // Code VCU gửi: 0x01F4 (500) -> chú thích là 5000ms => đơn vị là 10ms
             if (p2_star_val > 0) {
                 this->p2_timeout = p2_star_val * 10;
                 std::cout << "[UDS_Client - 0x10] UPDATED TIMEOUT to " << this->p2_timeout << "ms <<" << std::endl;
             }
-        } else {
+        }
+	else {
             std::cout << "[UDS_Client - 0x10] <WARNING> VCU response too short, keeping default timeout." << std::endl;
         }
-    } else {
+    }
+    else {
         std::cerr << "[UDS_Client - 0x10] Session Request Failed! NRC: 0x"
                   << std::hex << (int)resp.getNRC() << std::dec << std::endl;
     }
@@ -139,7 +141,7 @@ void UdsClient::sendTesterPresent() {
     // "Đừng trả lời nếu thành công"
     std::vector<uint8_t> payload = { 0x80 };
     // 2. Đóng gói thành UdsMessage
-    //    Dùng static_cast để ép kiểu Enum class sang uint8_t
+    // Dùng static_cast để ép kiểu Enum class sang uint8_t
     UdsMessage req(static_cast<uint8_t>(Uds::Sid::TesterPresent), payload);
     // 3. Gửi đi và KHÔNG CHỜ (Fire & Forget)
     if (transport) {
@@ -166,7 +168,7 @@ bool UdsClient::unlockSecurity(uint8_t level) {
     // Level 1: 0x01 (Request Seed)
     std::cout << "[UDS_Client - 0x27] Starting Security Access (Level 0x" << std::hex << (int)level << ")..." << std::endl;
     try {
-	// --- BƯỚC A: REQUEST SEED (0x27 01) ---
+	// BƯỚC A: REQUEST SEED (0x27 01)
 	std::vector<uint8_t> payloadSeed = { level };
 	UdsMessage reqSeed(static_cast<uint8_t>(Uds::Sid::SecurityAccess), payloadSeed);
 	UdsResponse respSeed = sendAndWait(reqSeed);
@@ -181,7 +183,7 @@ bool UdsClient::unlockSecurity(uint8_t level) {
             return false;
 	}
 
-	// --- BƯỚC B: GET SEED & CHECK LOCKED STATUS ---
+	// BƯỚC B: GET SEED & CHECK LOCKED STATUS
 	const std::vector<uint8_t>& seedData = respSeed.getData();
 
 	// Kiểm tra độ dài: 1 byte SID + 1 byte subfunc + 4 byte seed
@@ -197,21 +199,21 @@ bool UdsClient::unlockSecurity(uint8_t level) {
 	seed |= (uint32_t)seedData[3] << 8;
 	seed |= (uint32_t)seedData[4];
 
-	std::cout << "[Client - 0x27] Got Seed: 0x" << std::hex << seed << std::endl;
+	std::cout << "[UDS_Client - 0x27] Got Seed: 0x" << std::hex << seed << std::endl;
 
-	// [LOGIC VCU]: Nếu Seed = 0 -> Đã Unlock rồi -> Return True
+	// [LOGIC VCU]: Nếu Seed = 0 -> Unlocked -> Return True
 	if (seed == 0x00000000) {
-	    std::cout << "[Client - 0x27] VCU says: Already Unlocked! (Seed is 0)" << std::endl;
+	    std::cout << "[UDS_Client - 0x27] VCU says: Already Unlocked! (Seed is 0)" << std::endl;
             return true;
         }
 
-        // --- BƯỚC C: COMPUTE KEY ---
+        // BƯỚC C: COMPUTE KEY
         // Thuật toán: Key = Seed ^ Mask (Lấy Mask từ UdsConstants)
         uint32_t key = seed ^ Uds::Security::SECURITY_MASK;
         std::cout << "[UDS_Client - 0x27] Computed Key: 0x" << std::hex << key
 	          << "(Mask: 0x" << Uds::Security::SECURITY_MASK << ")" << std::endl;
 
-        // --- BƯỚC D: SEND KEY (0x27 02) ---
+        // BƯỚC D: SEND KEY (0x27 02)
         std::vector<uint8_t> payloadKey;
         payloadKey.push_back(level + 1); // Sub-function: Send Key (0x02)
 
@@ -224,7 +226,7 @@ bool UdsClient::unlockSecurity(uint8_t level) {
         UdsMessage reqKey(static_cast<uint8_t>(Uds::Sid::SecurityAccess), payloadKey);
         UdsResponse respKey = sendAndWait(reqKey);
 
-        // --- BƯỚC E: VERIFY RESULT ---
+        // BƯỚC E: VERIFY RESULT
         if (respKey.isPositive()) {
             std::cout << "[UDS_Client - 0x27] Security Access UNLOCKED successfully!" << std::endl;
             return true;
@@ -310,10 +312,10 @@ uint32_t UdsClient::requestDownload(uint32_t address, uint32_t size) {
 
     try {
 	// 4. Gửi và chờ phản hồi qua "Trái tim" sendAndWait
-        // Không cần quan tâm 0x78 ở đây, sendAndWait đã tự lo!
+        // Không cần quan tâm 0x78, sendAndWait đảm nhận!
         UdsResponse resp = sendAndWait(reqMsg);
 
-        // 5. Đến đây, chắc chắn 100% là Positive Response (0x74)
+        // 5. Chắc chắn 100% Positive Response (0x74)
         std::vector<uint8_t> respData = resp.getData();
 
         // respData[0] là LengthFormatIdentifier (VD: 0x20)
@@ -324,11 +326,11 @@ uint32_t UdsClient::requestDownload(uint32_t address, uint32_t size) {
             return maxBlockLen;
         } else {
             std::cerr << "[UDS_Client - 0x34] <ERROR> Invalid positive response payload length!\n";
-            return 0; // Trả về 0 nghĩa là FOTA thất bại
+            return 0; // Trả về 0 -> FOTA thất bại
         }
     }
     catch (const UdsException& e) {
-	// Bắt mọi lỗi từ Timeout, Giao thức, đến NRC (0x13, 0x22, 0x31...)
+	// Bắt mọi lỗi từ Timeout, Giao thức, đến NRC (0x13, 0x22, 0x31)
         std::cerr << "[UDS_Client - 0x34] <ERROR> RequestDownload Failed: " << e.what() << std::endl;
         return 0;
     }

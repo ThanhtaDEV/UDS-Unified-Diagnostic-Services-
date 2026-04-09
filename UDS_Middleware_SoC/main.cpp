@@ -8,7 +8,7 @@
 #include "FOTA_Manager.h"
 #include "UdsConstants.h"
 
-// --- CẤU HÌNH MẶC ĐỊNH ---
+// CẤU HÌNH MẶC ĐỊNH
 std::string g_canInterface = "can0";
 uint32_t g_txId = 0x7E0; // SoC gửi
 uint32_t g_rxId = 0x7E8; // SoC nhận
@@ -151,7 +151,7 @@ int main(int argc, char* argv[]) {
     		if (std::filesystem::exists(targetDir)) {
         	    // Duyệt qua tất cả các file trong thư mục
         	    for (const auto& entry : std::filesystem::directory_iterator(targetDir)) {
-            	    // Nếu đuôi file là .zip thì lụm luôn
+            	    // Nếu đuôi file là .zip thì nhận
             		if (entry.path().extension() == ".zip") {
                 	    zipPath = entry.path().string();
                 	    break; // Chỉ lấy 1 file duy nhất rồi thoát vòng lặp

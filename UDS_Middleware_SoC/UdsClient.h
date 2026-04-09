@@ -14,12 +14,12 @@
 #include "UdsException.h"
 #include "UdsConstants.h"
 
-// Forward declaration cho Security (để dành cho sau này, đúng như sơ đồ)
+// Forward declaration cho Security (cho sau này)
 class SecurityManager;
 
 class UdsClient {
 private:
-    // Dependency 1: Giao tiếp (Cái miệng/tai)
+    // Dependency 1: Giao tiếp
     ITransport* transport;
 
     // Dependency 2: Bảo mật (để null nếu chưa dùng)

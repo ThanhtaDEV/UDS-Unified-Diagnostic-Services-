@@ -324,7 +324,7 @@ int main(int argc, char* argv[]) {
     signal(SIGINT, signalHandler);  // Bắt Ctrl+C (Khi debug)
     signal(SIGTERM, signalHandler); // Bắt lệnh kill từ systemctl (Khi chạy Production)
 
-    std::cout << "  SoC DAEMON: AUTO FOTA & AI CONTROL CENTER \n";
+    std::cout << "[SoC DAEMON] AUTOMOTIVE FOTA & AI CONTROL CENTER \n";
 
     FotaManager fotaApp;
     g_fotaManager = &fotaApp;

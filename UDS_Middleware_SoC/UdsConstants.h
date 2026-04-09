@@ -19,7 +19,7 @@ namespace Uds {
         TransferData             = 0x36,
         RequestTransferExit      = 0x37,
 
-	// // Response IDs
+	// Response IDs
         NegativeResponse         = 0x7F
     };
 
@@ -75,9 +75,9 @@ namespace Uds {
 
     // Tham số cho Service 0x27 (Security Access)
     namespace Security {
-        constexpr uint8_t RequestSeed   = 0x01; // Xin Seed (Level 1)
-        constexpr uint8_t SendKey       = 0x02; // Gửi Key (Level 1)
-	constexpr uint32_t SECURITY_MASK = 0x12345678; // Thuật toán Level 1
+        constexpr uint8_t RequestSeed   = 0x01; 	// Xin Seed (Level 1)
+        constexpr uint8_t SendKey       = 0x02; 	// Gửi Key (Level 1)
+	constexpr uint32_t SECURITY_MASK = 0x12345678; 	// Thuật toán Level 1
     }
 
     // Hàm tính SID phản hồi thành công (Request + 0x40)

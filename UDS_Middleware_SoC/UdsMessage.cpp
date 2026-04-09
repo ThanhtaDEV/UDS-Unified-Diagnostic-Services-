@@ -54,4 +54,3 @@ size_t UdsMessage::getPayloadSize() const {
 std::vector<uint8_t>& UdsMessage::getPayloadVector() {
     return payload;
 }
-

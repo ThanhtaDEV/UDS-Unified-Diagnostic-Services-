@@ -17,7 +17,6 @@ FotaManager::FotaManager()
 
 FotaManager::~FotaManager() {
     stop(); // Đảm bảo thread dừng trước khi hủy object
-
     // Dọn dẹp bộ nhớ theo thứ tự ngược lại lúc tạo
     if (client) delete client;
     if (transport) delete transport;
@@ -25,7 +24,6 @@ FotaManager::~FotaManager() {
 
 bool FotaManager::initialize(const std::string& interfaceName, uint32_t txId, uint32_t rxId) {
     std::cout << "[FOTA_App] Initializing FOTA Manager..." << std::endl;
-
     // Reset trạng thái an toàn
     isRunning = false;
     isHeartbeatRunning = false;
@@ -35,7 +33,7 @@ bool FotaManager::initialize(const std::string& interfaceName, uint32_t txId, ui
     if (transport) { delete transport; transport = nullptr; }
 
     try {
-	// Gọi Constructor có tham số (thay vì open)
+	// Gọi Constructor có tham số
         transport = new SocketCanTransport(interfaceName, txId, rxId);
 
 	if (!transport->isValid()) {
@@ -46,25 +44,14 @@ bool FotaManager::initialize(const std::string& interfaceName, uint32_t txId, ui
 
         // Tạo Client và inject Transport vào
         client = new UdsClient(transport, nullptr, 2000);
-
 	std::cout << "[FOTA_App] Transport Initialized on " << interfaceName
                   << " (Tx: 0x" << std::hex << txId << ", Rx: 0x" << rxId << ")" << std::endl;
-
         return true;
     }
     catch (const std::exception& e) {
 	std::cerr << "[FOTA_App] FAILED to initialize Transport: " << e.what() << std::endl;
 	return false;
     }
-	// Gọi hàm open của Transport
-	// Lưu ý: Đảm bảo SocketCanTransport::open trả về bool và nhận đúng tham số
-    //if (transport->open(interfaceName, txId, rxId)) {
-        //std::cout << "[App] Connected to " << interfaceName
-                  //<< " (Tx: 0x" << std::hex << txId << ", Rx: 0x" << rxId << ")" << std::endl;
-        //return true;
-    //} else {
-        //std::cerr << "[App] FAILED to open CAN interface: " << interfaceName << std::endl;
-        //return false;
 }
 
 void FotaManager::stop() {
@@ -93,11 +80,11 @@ void FotaManager::startResetProcess() {
     stopHeartbeat();
 
     if (isRunning) {
-        std::cout << "[FOTA_App - Reset_ECU] System Busy!" << std::endl;
+        std::cout << "[FOTA_App - Start_Reset_ECU] System Busy!" << std::endl;
         return;
     }
 
-    std::cout << "[FOTA_App - Reset_ECU] Launching RESET Task." << std::endl;
+    std::cout << "[FOTA_App - Start_Reset_ECU] Launching RESET Task." << std::endl;
     isRunning = true;
 
     if (workerThread.joinable()) {
@@ -112,7 +99,7 @@ void FotaManager::startResetProcess() {
 }
 
 void FotaManager::runResetTask() {
-    std::cout << "[FOTA_App - Thread_Reset] RESET Task Started. " << std::endl;
+    std::cout << "[FOTA_App - Run_Reset_ECU] RESET Task Started. " << std::endl;
     // Reset cờ thành false ngay từ đầu để đảm bảo an toàn
     m_taskSuccess = false;
 
@@ -122,24 +109,24 @@ void FotaManager::runResetTask() {
     stopHeartbeat();
 
     try {
-	std::cout << "[FOTA_App - Thread_Reset] Sending VCU Hard Reset (0x11)." << std::endl;
+	std::cout << "[FOTA_App - Run_Reset_ECU] Sending VCU Hard Reset (0x11)." << std::endl;
 	UdsResponse resp = client->requestHardReset();
 
         if (resp.isPositive()) {
-	    std::cout << "[FOTA_App - Thread_Reset] RESET SUCCESS!" << std::endl;
+	    std::cout << "[FOTA_App - Run_Reset_ECU] RESET SUCCESS!" << std::endl;
 	    m_taskSuccess = true;
         } else {
-            std::cerr << "[FOTA_App - Thread_Reset] RESET FAILED! (NRC: 0x" << std::hex << (int)resp.getNRC() << ")" << std::endl;
+            std::cerr << "[FOTA_App - Run_Reset_ECU] RESET FAILED! (NRC: 0x" << std::hex << (int)resp.getNRC() << ")" << std::endl;
 	    m_taskSuccess = false;
         }
     }
     catch (const std::exception& e) {
-        std::cerr << "[FOTA_App - Thread_Reset] Error in worker: " << e.what() << std::endl;
+        std::cerr << "[FOTA_App - Run_Reset_ECU] Error in worker: " << e.what() << std::endl;
 	m_taskSuccess = false;
     }
 
     isRunning = false;
-    std::cout << "[FOTA_App - Thread_Reset] Task Finished." << std::endl;
+    std::cout << "[FOTA_App - Run_Reset_ECU] Task Finished." << std::endl;
 }
 
 // =========================================================
@@ -147,10 +134,10 @@ void FotaManager::runResetTask() {
 // =========================================================
 void FotaManager::startSessionProcess() {
     if (isRunning) {
-        std::cout << "[FOTA_App - Session_Control] System Busy!" << std::endl;
+        std::cout << "[FOTA_App - Start_Session_Control] System Busy!" << std::endl;
         return;
     }
-    std::cout << "[FOTA_App - Session_Control] Launching SESSION Task." << std::endl;
+    std::cout << "[FOTA_App - Start_Session_Control] Launching SESSION Task." << std::endl;
     isRunning = true;
 
     // Trỏ thẳng thread vào hàm runSessionTask
@@ -161,35 +148,35 @@ void FotaManager::startSessionProcess() {
 }
 
 void FotaManager::runSessionTask() {
-    std::cout << "[FOTA_App - Thread_Session] SESSION Task Started." << std::endl;
+    std::cout << "[FOTA_App - Run_Session] SESSION Task Started." << std::endl;
     // Reset cờ thành false ngay từ đầu để đảm bảo an toàn
     m_taskSuccess = false;
 
     std::this_thread::sleep_for(std::chrono::milliseconds(500));
 
     try {
-        std::cout << "[FOTA_App - Thread_Session] Sending SessionControl (Send Key)..." << std::endl;
+        std::cout << "[FOTA_App - Run_Session] Sending SessionControl (Send Key)..." << std::endl;
         UdsResponse resp = client->requestSession(Uds::Session::Programming);
 
         if (resp.isPositive()) {
-            std::cout << "[FOTA_App - Thread_Session] SESSION changed to PROGRAMMING." << std::endl;
+            std::cout << "[FOTA_App - Run_Session] SESSION changed to PROGRAMMING." << std::endl;
 	    // [QUAN TRỌNG] Vào Programming thành công thì phải BẬT Heartbeat ngay
-            // để VCU không tự thoát ra sau 5 giây (S3 Server Timeout)
+            // Để VCU không tự thoát ra sau 5 giây (S3 Server Timeout)
             startHeartbeat();
 	    m_taskSuccess = true;
         }
 	else {
-            std::cerr << "[FOTA_App - Thread_Session] SESSION change Failed! (NRC: 0x" << std::hex << (int)resp.getNRC() << ")" << std::endl;
+            std::cerr << "[FOTA_App - Run_Session] SESSION change Failed! (NRC: 0x" << std::hex << (int)resp.getNRC() << ")" << std::endl;
 	    m_taskSuccess = false;
         }
     }
     catch (const std::exception& e) {
-        std::cerr << "[FOTA_App - Thread_Session] Error: " << e.what() << std::endl;
+        std::cerr << "[FOTA_App - Run_Session] Error: " << e.what() << std::endl;
 	m_taskSuccess = false;
     }
 
     isRunning = false;
-    std::cout << "[FOTA_App - Thread_Session] SESSION Task Finished." << std::endl;
+    std::cout << "[FOTA_App - Run_Session] SESSION Task Finished." << std::endl;
 }
 
 // =========================================================
@@ -201,7 +188,7 @@ void FotaManager::startHeartbeat() {
     // Dọn thread cũ nếu còn sót
     if (heartbeatThread.joinable()) heartbeatThread.join();
 
-    std::cout << "[FOTA_App - Tester_Present] STARTING HEARTBEAT (Tester Present)." << std::endl;
+    std::cout << "[FOTA_App - Start_Tester_Present] STARTING HEARTBEAT (Tester Present)." << std::endl;
     isHeartbeatRunning = true;
     heartbeatThread = std::thread(&FotaManager::runHeartbeatTask, this);
 }
@@ -209,7 +196,7 @@ void FotaManager::startHeartbeat() {
 void FotaManager::stopHeartbeat() {
     if (!isHeartbeatRunning) return;
 
-    std::cout << "[FOTA_App - Tester_Present] STOPPING HEARTBEAT." << std::endl;
+    std::cout << "[FOTA_App - Stop_Tester_Present] STOPPING HEARTBEAT." << std::endl;
     isHeartbeatRunning = false; // Hạ cờ để vòng lặp thoát
 
     if (heartbeatThread.joinable()) {
@@ -238,11 +225,11 @@ void FotaManager::startSecurityProcess() {
     if (workerThread.joinable()) workerThread.join();
 
     if (isRunning) {
-        std::cout << "[FOTA_App - Security_Access] System Busy!" << std::endl;
+        std::cout << "[FOTA_App - Start_SecurityAccess] System Busy!" << std::endl;
         return;
     }
 
-    std::cout << "[FOTA_App - Security_Access] Launching SECURITY Task." << std::endl;
+    std::cout << "[FOTA_App - Start_SecurityAccess] Launching SECURITY Task." << std::endl;
     isRunning = true;
 
     // Khởi chạy thread, trỏ thread vào hàm runSecurityTask
@@ -253,7 +240,7 @@ void FotaManager::startSecurityProcess() {
 }
 
 void FotaManager::runSecurityTask() {
-    std::cout << "[FOTA_App - Thread_Security] SECURITY ACCESS Task Started." << std::endl;
+    std::cout << "[FOTA_App - Run_SecurityAccess] SECURITY ACCESS Task Started." << std::endl;
     // Reset cờ thành false ngay từ đầu để đảm bảo an toàn
     m_taskSuccess = false;
 
@@ -263,21 +250,21 @@ void FotaManager::runSecurityTask() {
 	bool success = client->unlockSecurity(Uds::Security::RequestSeed);
 
 	if (success) {
-	    std::cout << "[FOTA_App - Thread_Security] Security Access Flow Completed Successfully." << std::endl;
+	    std::cout << "[FOTA_App - Run_SecurityAccess] Security Access Flow Completed Successfully." << std::endl;
 	    m_taskSuccess = true;
         }
         else {
-            std::cerr << "[FOTA_App - Thread_Security] Security Access Flow FAILED." << std::endl;
+            std::cerr << "[FOTA_App - Run_SecurityAccess] Security Access Flow FAILED." << std::endl;
 	    m_taskSuccess = false;
         }
     }
     catch (const std::exception& e) {
-	std::cerr << "[FOTA_App - Thread_Security] Exception caught: " << e.what() << std::endl;
+	std::cerr << "[FOTA_App - Run_SecurityAccess] Exception caught: " << e.what() << std::endl;
         m_taskSuccess = false;
     }
 
     isRunning = false;
-    std::cout << "[FOTA_App - Thread_Security] Task Finished." << std::endl;
+    std::cout << "[FOTA_App - Run_SecurityAccess] Task Finished." << std::endl;
 }
 
 // ============================================================================
@@ -352,7 +339,6 @@ uint32_t FotaManager::calculateFileCRC32(const std::string& filePath) {
     }
 
     uint32_t crc = crc32(0L, Z_NULL, 0);
-    //uint32_t poly = 0x04C11DB7;
     char buffer[4096];
 
     while (file.read(buffer, sizeof(buffer)) || file.gcount() > 0) {
@@ -366,7 +352,7 @@ uint32_t FotaManager::calculateFileCRC32(const std::string& filePath) {
 // =========================================================
 void FotaManager::startRequestDownloadProcess(const std::string& zipFilePath) {
     if (isRunning.load()) {
-        std::cerr << "[FOTA_App - Request_Download] <WWARNING> A process is already running!\n";
+        std::cerr << "[FOTA_App - Start_RequestDownload] <WWARNING> A process is already running!\n";
         return;
     }
 
@@ -386,7 +372,7 @@ void FotaManager::startRequestDownloadProcess(const std::string& zipFilePath) {
 }
 
 void FotaManager::runRequestDownloadTask() {
-    std::cout << "[FOTA_App - Thread_RequestDownload] STARTING FIRMWARE VERIFICATION & 0x34 \n";
+    std::cout << "[FOTA_App - Run_RequestDownload] STARTING FIRMWARE VERIFICATION & 0x34 \n";
     // Reset cờ thành false ngay từ đầu để đảm bảo an toàn
     m_taskSuccess = false;
 
@@ -402,7 +388,7 @@ void FotaManager::runRequestDownloadTask() {
     }
 
     // BƯỚC 3: Verify CRC32 của file Firmware
-    std::cout << "[FOTA_App - Thread_RequestDownload] Caculating CRC32 For: " << m_binFilePath << " ...\n";
+    std::cout << "[FOTA_App - Run_RequestDownload] Caculating CRC32 For: " << m_binFilePath << " ...\n";
     uint32_t actualCrc32 = calculateFileCRC32(m_binFilePath);
 
     std::cout << "[Verify] Expected CRC (from JSON) : 0x" << std::hex << m_expectedCrc32 << "\n";
@@ -410,16 +396,16 @@ void FotaManager::runRequestDownloadTask() {
 
     if (actualCrc32 != m_expectedCrc32) {
 	std::cerr << "[Verify] Result: MISMATCH! \n";
-        std::cerr << "[FOTA_App - Thread_RequestDownload] CRITICAL ERROR: The Firmware file is corrupted or invalid!\n";
-        std::cerr << "[FOTA_App - Thread_RequestDownload] ABORTING FOTA PROCESS! (Request Download - 0x34 will not be sent). \n";
+        std::cerr << "[FOTA_App - Run_RequestDownload] CRITICAL ERROR: The Firmware file is corrupted or invalid!\n";
+        std::cerr << "[FOTA_App - Run_RequestDownload] ABORTING FOTA PROCESS! (Request Download - 0x34 will not be sent). \n";
         isRunning.store(false);
         return; // Dừng lập tức, không cho phép gọi 0x34
     }
     std::cerr << "[Verify] Result: MATCH! Firmware is perfectly valid. \n";
 
     // BƯỚC 4: File an toàn 100%, tiến hành đàm phán với VCU (Lệnh 0x34)
-    std::cout << "[FOTA_App - Thread_RequestDownload] Sending 0x34 Request Download to VCU...\n";
-    std::cout << "[FOTA_App - Thread_RequestDownload] Target Address: 0x" << std::hex << m_targetAddress << ", Size: " << std::dec << m_otaSizeBytes << " bytes.\n";
+    std::cout << "[FOTA_App - Run_RequestDownload] Sending 0x34 Request Download to VCU...\n";
+    std::cout << "[FOTA_App - Run_RequestDownload] Target Address: 0x" << std::hex << m_targetAddress << ", Size: " << std::dec << m_otaSizeBytes << " bytes.\n";
 
     try {
 	// Gọi API của UdsClient, "trái tim" sẽ tự động bắt vòng lặp 0x78 nếu VCU bận xóa Flash
@@ -427,14 +413,14 @@ void FotaManager::runRequestDownloadTask() {
 
 	if (blockLen > 0) {
 	    m_maxBlockLength = blockLen - 2;
-            std::cout << "[FOTA_App - Thread_RequestDownload] 0x34 SUCCESS! VCU is ready to receive data.\n";
-	    std::cout << "[FOTA_App - Thread_RequestDownload] Raw Block Length from VCU: " << std::dec << blockLen << " bytes.\n";
-            std::cout << "[FOTA_App - Thread_RequestDownload] Actual Payload Size agreed: " << std::dec << m_maxBlockLength << " bytes.\n";
+            std::cout << "[FOTA_App - Run_RequestDownload] 0x34 SUCCESS! VCU is ready to receive data.\n";
+	    std::cout << "[FOTA_App - Run_RequestDownload] Raw Block Length from VCU: " << std::dec << blockLen << " bytes.\n";
+            std::cout << "[FOTA_App - Run_RequestDownload] Actual Payload Size agreed: " << std::dec << m_maxBlockLength << " bytes.\n";
 
 	    m_taskSuccess = true;
         }
 	else {
-            std::cerr << "[FOTA_App - Thread_RequestDownload] 0x34 FAILED! VCU rejected or returned invalid block length.\n";
+            std::cerr << "[FOTA_App - Run_RequestDownload] 0x34 FAILED! VCU rejected or returned invalid block length.\n";
 	    // Cố tình gán m_maxBlockLength = 0 để hàm 0x36 phía sau check thấy lỗi và tự hủy
             m_maxBlockLength = 0;
 
@@ -442,12 +428,12 @@ void FotaManager::runRequestDownloadTask() {
         }
     }
     catch (const std::exception& e) {
-	std::cerr << "[FOTA_App - Thread_RequestDownload] Exception caught: " << e.what() << "\n";
+	std::cerr << "[FOTA_App - Run_RequestDownload] Exception caught: " << e.what() << "\n";
         m_taskSuccess = false; // Bắt lỗi an toàn
     }
 
     // Kết thúc Thread
-    std::cout << "[FOTA_App - Thread_RequestDownload] Request Download Task Finished.\n";
+    std::cout << "[FOTA_App - Run_RequestDownload] Request Download Task Finished.\n";
     isRunning.store(false);
 }
 
@@ -455,45 +441,45 @@ void FotaManager::runRequestDownloadTask() {
 // SERVICE 6: TRANSFER DATA (0x36)
 // =========================================================
 void FotaManager::startTransferDataProcess() {
-    std::cout << "[FOTA_App - TransferData] Activating Transfer Data process (0x36).\n";
+    std::cout << "[FOTA_App - Start_TransferData] Activating Transfer Data process (0x36).\n";
     if (m_binFilePath.empty()) {
-        std::cerr << "[FOTA_App - TransferData] <ERROR> .bin file path is empty! Serivce 0x34 incomplete or decompression failed.\n";
+        std::cerr << "[FOTA_App - Start_TransferData] <ERROR> .bin file path is empty! Serivce 0x34 incomplete or decompression failed.\n";
         return; // Chặn đứng ngay lập tức!
     }
 
     if (m_maxBlockLength == 0) {
-        std::cerr << "[FOTA_App - TransferData] <ERROR> m_maxBlockLength = 0! VCU has not responded with allowed block size.\n";
+        std::cerr << "[FOTA_App - Start_TransferData] <ERROR> m_maxBlockLength = 0! VCU has not responded with allowed block size.\n";
         return;
     }
 
     // Khoá an toàn luồng
     if (isRunning.load()) {
-        std::cerr << "[FOTA_App - TransferData] <WARNING> Another FOTA process is running! Cannot start Service 0x36.\n";
+        std::cerr << "[FOTA_App - Start_TransferData] <WARNING> Another FOTA process is running! Cannot start Service 0x36.\n";
         return;
     }
 
     // Bật cờ báo hiệu hệ thống đang bận
     isRunning.store(true);
 
-    // Dọn dẹp cái luồng cũ (ví dụ luồng 0x34 vừa chạy xong)
+    // Dọn dẹp luồng cũ (luồng 0x34 vừa chạy xong)
     if (workerThread.joinable()) {
         workerThread.join();
     }
 
     stopHeartbeat();
 
-    // --- BƯỚC BẮN LUỒNG MỚI ---
-    std::cout << "[FOTA_App - TransferData] Spawning background thread to split File: " << m_binFilePath << "\n";
+    // BƯỚC ĐẨY LUỒNG MỚI
+    std::cout << "[FOTA_App - Start_TransferData] Spawning background thread to split File: " << m_binFilePath << "\n";
     workerThread = std::thread(&FotaManager::runTransferDataTask, this);
 }
 
 void FotaManager::runTransferDataTask() {
-    std::cout <<"[FOTA_App - Thread_TransferData] Staring 0x36 - Tranfer Data\n";
+    std::cout <<"[FOTA_App - Run_TransferData] Staring 0x36 - Tranfer Data\n";
     m_taskSuccess = false;
 
     std::ifstream binFile(m_binFilePath, std::ios::binary);
     if (!binFile.is_open()) {
-        std::cerr << "[FOTA_App - Thread_TransferData] <CRITICAL ERROR> Cannot open File " << m_binFilePath << "\n";
+        std::cerr << "[FOTA_App - Run_TransferData] <CRITICAL ERROR> Cannot open File " << m_binFilePath << "\n";
         isRunning.store(false);
         return;
     }
@@ -506,15 +492,15 @@ void FotaManager::runTransferDataTask() {
     std::vector<uint8_t> buffer(m_maxBlockLength);
 
     try {
-	// LÝ DO 2: Vòng lặp băm file
+	// LÝ DO 2: Vòng lặp băm file (Flashing)
 	while (binFile) {
-            // Cắt 1 khúc raw ném lên thớt
+            // Cắt 1 block raw để chuẩn bị flash
             binFile.read(reinterpret_cast<char*>(buffer.data()), m_maxBlockLength);
 
-            // LÝ DO 3: Tại sao gcount() là BẮT BUỘC?
+            // LÝ DO 3: Dùng gcount() là BẮT BUỘC
             // Giả sử m_payloadSizePerBlock = 1000. File có 2500 bytes.
             // Vòng 1: Cắt 1000. Vòng 2: Cắt 1000. Vòng 3: Chỉ còn dư 500 bytes!
-            // gcount() sẽ trả về đúng 500. Nếu không có gcount, bạn sẽ gửi nhầm 500 bytes rác cũ đi.
+            // gcount() sẽ trả về đúng 500. Nếu không có gcount, sẽ gửi nhầm 500 bytes rác cũ đi.
             std::streamsize bytesRead = binFile.gcount();
 
             if (bytesRead == 0) {
@@ -525,11 +511,11 @@ void FotaManager::runTransferDataTask() {
             std::vector<uint8_t> actualChunk(buffer.begin(), buffer.begin() + bytesRead);
 
             // LÝ DO 4: Giao hàng và Xử lý lỗi tức thời
-            // Gọi Platform tống xuống mạng CAN
+            // Gọi Platform đẩy xuống mạng CAN
             bool success = client->transferData(blockCounter, actualChunk);
 
             if (!success) {
-                std::cerr << "[FOTA_App - Thread_TransferData] ERROR in BLOCK 0x" << std::hex << (int)blockCounter
+                std::cerr << "[FOTA_App - Run_TransferData] ERROR in BLOCK 0x" << std::hex << (int)blockCounter
                           << ". VCU rejected request or connection lost. Cancel FOTA!\n";
                 binFile.close();
                 isRunning.store(false);
@@ -564,17 +550,17 @@ void FotaManager::runTransferDataTask() {
                       << totalBytesSent << "/" << m_otaSizeBytes << " bytes)"
                       << std::flush;
 
-            // Tự động tràn: Khi blockCounter = 255 (0xFF), lệnh ++ này sẽ đưa nó về 0 (0x00).
+            // Tự động tràn: Khi blockCounter = 255 (0xFF), lệnh ++ này sẽ đưa về 0 (0x00).
             // Đây là tính năng của kiểu uint8_t, đáp ứng hoàn hảo chuẩn đếm vòng của UDS.
             blockCounter++;
         }
 
 	m_taskSuccess = true;
         // Dọn dẹp chiến trường
-        std::cout << "\n[FOTA_App - Thread_TransferData] Service 0x36 SUCCESS! 100% of Data Successfully uploaded to VCU.\n";
+        std::cout << "\n[FOTA_App - Run_TransferData] Service 0x36 SUCCESS! 100% of Data Successfully uploaded to VCU.\n";
     }
     catch (const std::exception& e) {
-	std::cerr << "[FOTA_App - Thread_TransferData] Exception: " << e.what() << "\n";
+	std::cerr << "[FOTA_App - Run_TransferData] Exception: " << e.what() << "\n";
         m_taskSuccess = false;
     }
 
@@ -589,11 +575,11 @@ void FotaManager::runTransferDataTask() {
 // SERVICE 7: TRANSFER EXIT (0x37)
 // =========================================================
 void FotaManager::startTransferExitProcess() {
-    std::cout << "[FOTA_App - Thread_TransferExit] Transfer Exit (0x37) Starting\n";
+    std::cout << "[FOTA_App - Start_TransferExit] Transfer Exit (0x37) Starting\n";
 
     // Khoá an toàn luồng: Đảm bảo luồng 0x36 đã thực sự nhường sân
     if (isRunning.load()) {
-        std::cerr << "[FOTA_App - Thread_TransferExit] <WARNING> Another FOTA process is already running! Cannot start 0x37.\n";
+        std::cerr << "[FOTA_App - Start_TransferExit] <WARNING> Another FOTA process is already running! Cannot start 0x37.\n";
         return;
     }
 
@@ -608,13 +594,13 @@ void FotaManager::startTransferExitProcess() {
     // Đảm bảo Heartbeat đã tắt để chuẩn bị chốt sổ và Reset
     stopHeartbeat();
 
-    // BƯỚC BẮN LUỒNG MỚI
-    std::cout << "[FOTA_App - TransferExit] Spawning background thread to finalize Service 0x37.\n";
+    // BƯỚC ĐẨY LUỒNG MỚI
+    std::cout << "[FOTA_App - Start_TransferExit] Spawning background thread to finalize Service 0x37.\n";
     workerThread = std::thread(&FotaManager::runTransferExitTask, this);
 }
 
 void FotaManager::runTransferExitTask() {
-    std::cout << "[FOTA_App - Thread_TransferExit] Requesting VCU to perform Hardware CRC scan and write Metadata.\n";
+    std::cout << "[FOTA_App - Run_TransferExit] Requesting VCU to perform Hardware CRC scan and write Metadata.\n";
     m_taskSuccess = false;
 
     try {
@@ -622,20 +608,20 @@ void FotaManager::runTransferExitTask() {
         bool isSuccess = client->requestTransferExit();
 
         if (isSuccess) {
-            std::cout << "[FOTA_App - Thread_TransferExit] <OK> Command 0x37 send Successfully!\n";
-            std::cout << "[FOTA_App - Thread_TransferExit] VCU verified CRC and marked BANK_STATE_VALID\n";
+            std::cout << "[FOTA_App - Run_TransferExit] <OK> Command 0x37 send Successfully!\n";
+            std::cout << "[FOTA_App - Run_TransferExit] VCU verified CRC and marked BANK_STATE_VALID\n";
 
 	    m_taskSuccess = true;
             // (Tùy chọn) Bạn có thể tự động trigger lệnh Reset tại đây nếu muốn luồng chạy liên tục:
             // startResetProcess();
         }
 	else {
-            std::cerr << "[FOTA_App - Thread_TransferExit] <ERROR> Service 0x37 FAILED! VCU rejected finalize command (CRC Mismatch or Flash Error).\n";
+            std::cerr << "[FOTA_App - Run_TransferExit] <ERROR> Service 0x37 FAILED! VCU rejected finalize command (CRC Mismatch or Flash Error).\n";
 	    m_taskSuccess = false;
         }
     }
     catch (const std::exception& e) {
-	std::cerr << "[FOTA_App - Thread_TransferExit] Exception: " << e.what() << "\n";
+	std::cerr << "[FOTA_App - Run_TransferExit] Exception: " << e.what() << "\n";
         m_taskSuccess = false;
     }
 
@@ -644,6 +630,6 @@ void FotaManager::runTransferExitTask() {
     // để các hàm start...() tiếp theo (như startResetProcess) có thể vượt qua hàm if(isRunning.load())
     startHeartbeat();
     isRunning.store(false);
-    std::cout << "[FOTA_App - Thread_TransferExit] Service 0x37 completed and self-released.\n";
+    std::cout << "[FOTA_App - Run_TransferExit] Service 0x37 completed and self-released.\n";
 }
 
