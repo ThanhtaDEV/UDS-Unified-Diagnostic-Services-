@@ -37,7 +37,7 @@ const std::string FIRMWARE_DIR = "Firmware/";
 const string LAST_FILE_TXT = FIRMWARE_DIR + "last_downloaded.txt";
 
 // Cấu hình Web API
-const string SERVER_URL = "http://172.20.10.13:8000";
+const string SERVER_URL = "https://fota.sdv-core.local"; // Nginx sẽ gác ở cổng chuẩn 443
 const string CHECK_API = SERVER_URL + "/api/firmware/check/";
 const string DOWNLOAD_API = SERVER_URL + "/api/firmware/latest/";
 
@@ -160,8 +160,25 @@ void webPollerThread() {
             curl_easy_setopt(curl, CURLOPT_WRITEDATA, &readBuffer);
             curl_easy_setopt(curl, CURLOPT_TIMEOUT, 5L);
 
-            CURLcode res = curl_easy_perform(curl);
+	    // [NẠP CHÌA KHÓA mTLS TỪ KÉT SẮT]
+	    // 1. Xác minh Server bằng Root CA
+	    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 1L);
+	    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 2L); // Ép kiểm tra tên miền
+	    curl_easy_setopt(curl, CURLOPT_CAINFO, "/etc/fota_keys/rootCA.crt");
 
+	    // 2.Trình Certification và Private Key của Pi cho Server
+	    curl_easy_setopt(curl, CURLOPT_SSLCERT, "/etc/fota_keys/pi_client.crt");
+	    curl_easy_setopt(curl, CURLOPT_SSLKEY, "/etc/fota_keys/pi_client.key");
+
+	    // Check Log mTLS
+	    curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
+
+	    // 3. Khai báo định dạng file
+	    curl_easy_setopt(curl, CURLOPT_SSLCERTTYPE, "PEM");
+            curl_easy_setopt(curl, CURLOPT_SSLKEYTYPE, "PEM");
+
+            CURLcode res = curl_easy_perform(curl);
+	    // Kiểm tra có file mới không
             if (res == CURLE_OK && readBuffer.find("\"has_firmware\": true") != string::npos) {
                 string latest_filename = extractJsonValue(readBuffer, "filename");
 
@@ -178,24 +195,29 @@ void webPollerThread() {
                         curl_easy_setopt(curl, CURLOPT_URL, DOWNLOAD_API.c_str());
                         curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteFileCallback);
                         curl_easy_setopt(curl, CURLOPT_WRITEDATA, fp);
-                        curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L); 
+                        curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
 
+			// Gọi lại curl_easy_perform, libcurl sẽ TỰ ĐỘNG tái sử dụng cấu hình mTLS
                         res = curl_easy_perform(curl);
                         fclose(fp);
 
                         if (res == CURLE_OK) {
-                            // [BÓP CÒ]: Tải xong 100%, đổi tên .tmp thành .zip
+                            // Tải xong 100%, đổi tên .tmp thành .zip
                             fs::rename(tmp_path, final_path);
                             cout << "[Web Poller] DOWNLOAD SUCCESSFUL! Renamed to: " << final_path << endl;
                             updateLocalFilename(latest_filename);
                         } else {
                             // Tải lỗi (rớt mạng) -> Xóa file rác
                             fs::remove(tmp_path);
-                            cerr << "[Web Poller] Download error. Will retry later." << endl;
+                            cerr << "[Web Poller] Download error: " << curl_easy_strerror(res) <<". Will retry later." << endl;
                         }
                     }
                 }
             }
+	    else if (res != CURLE_OK) {
+		// In ra nguyên nhân mTLS thất bại (debug)
+                cerr << "[Web Poller] TLS Handshake / API Check failed: " << curl_easy_strerror(res) << endl;
+	    }
             curl_easy_cleanup(curl);
         }
 
