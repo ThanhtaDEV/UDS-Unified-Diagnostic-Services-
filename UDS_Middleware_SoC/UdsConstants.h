@@ -6,21 +6,24 @@ namespace Uds {
     // List SID chuẩn ISO 14229 phù hợp FOTA
     enum class Sid : uint8_t {
 	// Diagnostic & Communication Management
-	DiagnosticSessionControl = 0x10,
-	EcuReset                 = 0x11,
-	SecurityAccess           = 0x27,
-	TesterPresent            = 0x3E,
+	DiagnosticSessionControl 	= 0x10,
+	EcuReset                 	= 0x11,
+	ClearDiagnosticInformation	= 0x14,
+	ReadDTCInformation		= 0x19,
+	ReadDataByIdentifier		= 0x22,
+	SecurityAccess           	= 0x27,
+	TesterPresent            	= 0x3E,
 
 	// Remote Activation
-        RoutineControl           = 0x31,
+        RoutineControl           	= 0x31,
 
 	// Upload/Download (FOTA Core)
-        RequestDownload          = 0x34,
-        TransferData             = 0x36,
-        RequestTransferExit      = 0x37,
+        RequestDownload          	= 0x34,
+        TransferData             	= 0x36,
+        RequestTransferExit      	= 0x37,
 
 	// Response IDs
-        NegativeResponse         = 0x7F
+        NegativeResponse         	= 0x7F
     };
 
     // 2. Các tham số cấu hình (Parameters) cho FOTA
@@ -78,6 +81,23 @@ namespace Uds {
         constexpr uint8_t RequestSeed   = 0x01; 	// Xin Seed (Level 1)
         constexpr uint8_t SendKey       = 0x02; 	// Gửi Key (Level 1)
 	constexpr uint32_t SECURITY_MASK = 0x12345678; 	// Thuật toán Level 1
+    }
+
+    // Tham số cho Service 0x19 (Read DTC Information)
+    namespace ReadDTC {
+        // Sub-functions cốt lõi cho Remote Diag
+        constexpr uint8_t ReportNumberOfDtcByStatusMask = 0x01; // Đếm số lượng lỗi
+        constexpr uint8_t ReportDtcByStatusMask         = 0x02; // Đọc danh sách mã lỗi
+        constexpr uint8_t ReportDtcSnapshotRecord       = 0x04; // Đọc dữ liệu đóng băng (Freeze Frame)
+
+        // Status Masks (Mặt nạ trạng thái chuẩn ISO)
+        constexpr uint8_t StatusMask_Active             = 0x09; // Lỗi đang bị (bit 0 và bit 3 = 1)
+        constexpr uint8_t StatusMask_All                = 0xFF; // Tìm tất cả các loại lỗi
+    }
+
+    // Tham số cho Service 0x14 (Clear DTC)
+    namespace CLearDTC{
+	constexpr uint32_t GroupAll = 0xFFFFFF; // Lệnh xóa toàn bộ các cụm lỗi
     }
 
     // Hàm tính SID phản hồi thành công (Request + 0x40)
