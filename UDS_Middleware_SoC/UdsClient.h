@@ -4,6 +4,9 @@
 #include <iostream>
 #include <vector>
 #include <cstdint>
+// Đồng bộ luồng - Thread Safety
+#include <mutex>
+#include <condition_variable>
 
 // KẾT NỐI VỚI "ITransport"
 #include "ITransport.h"
@@ -28,7 +31,12 @@ private:
     // Cấu hình: Thời gian chờ phản hồi (P2 Client)
     int p2_timeout;
 
-    // HELPER FUNCTION (QUAN TRỌNG)
+    // QUẢN LÝ TRANH CHẤP TÀI NGUYÊN BUS CAN
+    //std::mutex m_busAccessMutex;
+    //std::condition_variable m_busAvailabilityCv;
+    //bool is_fota_locked;	// Cờ đánh dấu FOTA đang chiếm dụng bus
+
+    // HELPER FUNCTION (IMPORTANT)
     // Hàm tách số 32-bit thành 4 byte để đẩy vào vector (dùng cho Address & Size)
     void append32BitToVector(std::vector<uint8_t>& vec, uint32_t value);
 
@@ -48,6 +56,16 @@ public:
 
     // Hàm nội bộ gửi và nhận
     UdsResponse sendAndWait(const UdsMessage& req);
+
+    /**
+     * @brief Khóa Bus CAN để chạy FOTA. Các luồng khác gọi sendAndWait sẽ bị ru ngủ sâu.
+     */
+    //void lockForFota();
+
+    /**
+     * @brief Nhả Bus CAN sau khi FOTA xong. Đánh thức các luồng đang ngủ (Diag) dậy.
+     */
+    //void unlockFota();
 
     // =============================
     // CÁC DỊCH VỤ CƠ BẢN (UDS APIs)
@@ -85,6 +103,35 @@ public:
 
     // Service 0x37: Request Transfer Exit (Kết thúc nạp)
     bool requestTransferExit();
+
+    /**
+     * @brief Service 0x19 0x01: Đếm số lượng mã lỗi hiện tại
+     * @param statusMask Mặt nạ lỗi (Ví dụ: 0x09 cho Active faults)
+     * @return UdsResponse Chứa payload chứa số lượng lỗi
+     */
+    //UdsResponse readDTCCount(uint8_t statusMask = 0x09);
+
+    /**
+     * @brief Service 0x19 0x02: Lấy danh sách chi tiết các mã lỗi
+     * @param statusMask Mặt nạ lỗi (Ví dụ: 0x09 cho Active faults)
+     * @return UdsResponse Chứa chuỗi các byte DTC (3 byte) và Status (1 byte)
+     */
+    //UdsResponse readDTCList(uint8_t statusMask = 0x09);
+
+    /**
+     * @brief Service 0x19 0x04: Đọc Snapshot (dữ liệu đóng băng) của 1 lỗi cụ thể
+     * @param dtc Ký hiệu DTC 3 byte (Ví dụ: 0xD01000)
+     * @param recordNumber Số thứ tự bản ghi (Mặc định 0x01)
+     * @return UdsResponse Dữ liệu môi trường lúc xảy ra lỗi
+     */
+    //UdsResponse readDTCSnapshot(uint32_t dtc, uint8_t recordNumber = 0x01);
+
+    /**
+     * @brief Service 0x14: Xóa toàn bộ mã lỗi trên VCU
+     * @param groupOfDTC Nhóm lỗi cần xóa (Mặc định 0xFFFFFF là xóa tất cả)
+     * @return UdsResponse
+     */
+    //UdsResponse clearDiagnosticInformation(uint32_t groupOfDTC = 0xFFFFFF);
 
 };
 
