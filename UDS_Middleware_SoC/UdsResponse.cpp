@@ -1,7 +1,8 @@
 // UdsResponse.cpp
 #include "UdsResponse.h"
 
-UdsResponse::UdsResponse(const std::vector<uint8_t>& rawData) {
+UdsResponse::UdsResponse(const std::vector<uint8_t>& rawData) 
+{
     // 1. Kiểm tra an toàn: Dữ liệu rỗng
     if (rawData.empty()) {
         sid = 0;
@@ -12,7 +13,8 @@ UdsResponse::UdsResponse(const std::vector<uint8_t>& rawData) {
 
     // 2. LOGIC UDS: Kiểm tra Byte đầu tiên
     // Theo chuẩn ISO 14229: Nếu byte đầu là 0x7F -> Negative Response
-    if (rawData[0] == 0x7F) {
+    if (rawData[0] == 0x7F) 
+    {
         _isPositive = false;
 
         // Cấu trúc gói lỗi: [0x7F] [Original SID] [NRC]
@@ -26,7 +28,8 @@ UdsResponse::UdsResponse(const std::vector<uint8_t>& rawData) {
         }
         // Gói lỗi không có payload data
     }
-    else {
+    else 
+    {
         // 3. Trường hợp Positive Response (Thành công)
         // Cấu trúc: [SID phản hồi] [Data Byte 1] [Data Byte 2]...
         _isPositive = true;

@@ -21,28 +21,30 @@ uint8_t UdsException::getNRC() const {
 }
 
 // TỪ ĐIỂN ÁNH XẠ MÃ LỖI (Dùng Enum thay vì số cứng)
-std::string UdsException::getNrcDescription(uint8_t nrcCode) {
+std::string UdsException::getNrcDescription(uint8_t nrcCode) 
+{
     // Ép kiểu sang Enum để code dễ đọc và match với file Constants
-    switch (static_cast<Uds::Nrc>(nrcCode)) {
-        case Uds::Nrc::GeneralReject:           return "General Reject";
-        case Uds::Nrc::ServiceNotSupported:     return "Service Not Supported";
-        case Uds::Nrc::SubFunctionNotSupported: return "Sub-function Not Supported";
-        case Uds::Nrc::InvalidFormat:           return "Incorrect Message Length Or Invalid Format";
-        case Uds::Nrc::ResponseTooLong:         return "Response Too Long";
-        case Uds::Nrc::BusyRepeatRequest:       return "Busy Repeat Request";
-        case Uds::Nrc::ConditionsNotCorrect:    return "Conditions Not Correct";
-        case Uds::Nrc::RequestSequenceError:    return "Request Sequence Error";
-        case Uds::Nrc::RequestOutOfRange:       return "Request Out Of Range";
-        case Uds::Nrc::SecurityAccessDenied:    return "Security Access Denied";
-        case Uds::Nrc::InvalidKey:              return "Invalid Key";
-        case Uds::Nrc::ExceedNumberOfAttempts:  return "Exceed Number Of Attempts";
+    switch (static_cast<Uds::Nrc>(nrcCode)) 
+    {
+        case Uds::Nrc::GeneralReject:               return "General Reject";
+        case Uds::Nrc::ServiceNotSupported:         return "Service Not Supported";
+        case Uds::Nrc::SubFunctionNotSupported:     return "Sub-function Not Supported";
+        case Uds::Nrc::InvalidFormat:               return "Incorrect Message Length Or Invalid Format";
+        case Uds::Nrc::ResponseTooLong:             return "Response Too Long";
+        case Uds::Nrc::BusyRepeatRequest:           return "Busy Repeat Request";
+        case Uds::Nrc::ConditionsNotCorrect:        return "Conditions Not Correct";
+        case Uds::Nrc::RequestSequenceError:        return "Request Sequence Error";
+        case Uds::Nrc::RequestOutOfRange:           return "Request Out Of Range";
+        case Uds::Nrc::SecurityAccessDenied:        return "Security Access Denied";
+        case Uds::Nrc::InvalidKey:                  return "Invalid Key";
+        case Uds::Nrc::ExceedNumberOfAttempts:      return "Exceed Number Of Attempts";
 
-        case Uds::Nrc::UploadDownloadNotAccepted: return "Upload/Download Not Accepted";
-        case Uds::Nrc::TransferDataSuspended:     return "Transfer Data Suspended";
+        case Uds::Nrc::UploadDownloadNotAccepted:   return "Upload/Download Not Accepted";
+        case Uds::Nrc::TransferDataSuspended:       return "Transfer Data Suspended";
 
-        case Uds::Nrc::GeneralProgrammingFailure: return "General Programming Failure";
-        case Uds::Nrc::WrongBlockSequenceCounter: return "Wrong Block Sequence Counter";
-        case Uds::Nrc::ResponsePending:           return "Response Pending (Wait...)";
+        case Uds::Nrc::GeneralProgrammingFailure:   return "General Programming Failure";
+        case Uds::Nrc::WrongBlockSequenceCounter:   return "Wrong Block Sequence Counter";
+        case Uds::Nrc::ResponsePending:             return "Response Pending (Wait...)";
 
         case Uds::Nrc::SubFunctionNotSupportedInActiveSession: return "Sub-function Not Supported In Active Session";
         case Uds::Nrc::ServiceNotSupportedInActiveSession:     return "Service Not Supported In Active Session";
