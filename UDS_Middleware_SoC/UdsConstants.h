@@ -5,24 +5,24 @@
 namespace Uds {
     // List SID chuẩn ISO 14229 phù hợp FOTA
     enum class Sid : uint8_t {
-	// Diagnostic & Communication Management
-	DiagnosticSessionControl 	= 0x10,
-	EcuReset                 	= 0x11,
-	ClearDiagnosticInformation	= 0x14,
-	ReadDTCInformation		= 0x19,
-	ReadDataByIdentifier		= 0x22,
-	SecurityAccess           	= 0x27,
-	TesterPresent            	= 0x3E,
+        // Diagnostic & Communication Management
+        DiagnosticSessionControl 	= 0x10,
+        EcuReset                 	= 0x11,
+        ClearDiagnosticInformation	= 0x14,
+        ReadDTCInformation		    = 0x19,
+        ReadDataByIdentifier		= 0x22,
+        SecurityAccess           	= 0x27,
+        TesterPresent            	= 0x3E,
 
-	// Remote Activation
+        // Remote Activation
         RoutineControl           	= 0x31,
 
-	// Upload/Download (FOTA Core)
+        // Upload/Download (FOTA Core)
         RequestDownload          	= 0x34,
         TransferData             	= 0x36,
         RequestTransferExit      	= 0x37,
 
-	// Response IDs
+        // Response IDs
         NegativeResponse         	= 0x7F
     };
 
@@ -49,7 +49,7 @@ namespace Uds {
         SecurityAccessDenied    		= 0x33, // Lỗi sai Key
         InvalidKey              		= 0x35, // Lỗi key không khớp
         ExceedNumberOfAttempts  		= 0x36, // Sai quá nhiều lần (bị Block)
-	RequiredTimeDelayNotExpired 		= 0x37,	// Đang bị phạt chờ (Delay)
+	    RequiredTimeDelayNotExpired 	= 0x37,	// Đang bị phạt chờ (Delay)
         UploadDownloadNotAccepted 		= 0x70, // VCU xóa Flash thất bại (Lỗi phần cứng)
         TransferDataSuspended   		= 0x71,	// Quá trình truyền bị đình chỉ
         GeneralProgrammingFailure 		= 0x72,	// VCU ghi Flash 0x36 thất bại
@@ -63,32 +63,36 @@ namespace Uds {
         ProtocolError           = 0xFE  // Wrong SID/Format parsing error
     };
 
-    namespace Session {
-	constexpr uint8_t Default       = 0x01;
+    namespace Session 
+    {
+	    constexpr uint8_t Default       = 0x01;
         constexpr uint8_t Programming   = 0x02; // Dùng cho FOTA
         constexpr uint8_t Extended      = 0x03;
     }
 
     // Tham số cho Service 0x11 (ECU Reset)
-    namespace Reset {
+    namespace Reset 
+    {
         constexpr uint8_t Hard          = 0x01; // Power On Reset
         constexpr uint8_t KeyOffOn      = 0x02;
         constexpr uint8_t Soft          = 0x03;
     }
 
     // Tham số cho Service 0x27 (Security Access)
-    namespace Security {
-        constexpr uint8_t RequestSeed   = 0x01; 	// Xin Seed (Level 1)
-        constexpr uint8_t SendKey       = 0x02; 	// Gửi Key (Level 1)
-	constexpr uint32_t SECURITY_MASK = 0x12345678; 	// Thuật toán Level 1
+    namespace Security 
+    {
+        constexpr uint8_t RequestSeed   = 0x01; 	    // Xin Seed (Level 1)
+        constexpr uint8_t SendKey       = 0x02; 	    // Gửi Key (Level 1)
+	    constexpr uint32_t SECURITY_MASK = 0x12345678; 	// Thuật toán Level 1
     }
 
     // Tham số cho Service 0x19 (Read DTC Information)
-    namespace ReadDTC {
+    namespace ReadDTC 
+    {
         // Sub-functions cốt lõi cho Remote Diag
-        constexpr uint8_t ReportNumberOfDtcByStatusMask = 0x01; // Đếm số lượng lỗi
-        constexpr uint8_t ReportDtcByStatusMask         = 0x02; // Đọc danh sách mã lỗi
-        constexpr uint8_t ReportDtcSnapshotRecord       = 0x04; // Đọc dữ liệu đóng băng (Freeze Frame)
+        constexpr uint8_t ReportNumberOfDTCByStatusMask = 0x01; // Đếm số lượng lỗi
+        constexpr uint8_t ReportDTCByStatusMask         = 0x02; // Đọc danh sách mã lỗi
+        constexpr uint8_t ReportDTCSnapshotRecord       = 0x04; // Đọc dữ liệu đóng băng (Freeze Frame)
 
         // Status Masks (Mặt nạ trạng thái chuẩn ISO)
         constexpr uint8_t StatusMask_Active             = 0x09; // Lỗi đang bị (bit 0 và bit 3 = 1)
@@ -96,12 +100,14 @@ namespace Uds {
     }
 
     // Tham số cho Service 0x14 (Clear DTC)
-    namespace CLearDTC{
-	constexpr uint32_t GroupAll = 0xFFFFFF; // Lệnh xóa toàn bộ các cụm lỗi
+    namespace ClearDTC
+    {
+	    constexpr uint32_t GroupAll = 0xFFFFFF; // Lệnh xóa toàn bộ các cụm lỗi
     }
 
     // Hàm tính SID phản hồi thành công (Request + 0x40)
-    constexpr uint8_t getPositiveResponseSid(Sid requestSid) {
+    constexpr uint8_t getPositiveResponseSid(Sid requestSid) 
+    {
         return static_cast<uint8_t>(requestSid) + 0x40;
     }
 }

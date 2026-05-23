@@ -14,7 +14,7 @@
 
 class FotaManager {
 public:
-    FotaManager();
+    explicit FotaManager(UdsClient* pClient);
     ~FotaManager();
     /**
      * @brief Khởi tạo kết nối CAN và các thành phần
@@ -22,7 +22,7 @@ public:
      * @param txId CAN ID gửi đi (SoC -> VCU, 0x7E0)
      * @param rxId CAN ID nhận về (VCU -> SoC, 0x7E8)
      */
-    bool initialize(const std::string& interfaceName, uint32_t txId, uint32_t rxId);
+    //bool initialize(const std::string& interfaceName, uint32_t txId, uint32_t rxId);
 
     // Session Control (Ox10)
     void startSessionProcess(); // Call API from main
@@ -63,10 +63,14 @@ public:
     // Để Master đọc kết quả sau khi xử lý xong
     bool getTaskResult() const;
 
+    // Quản lý tranh chấp
+    void lockBusForProgramming();
+    void unlockBusFromProgramming();
+
 private:
     // Composition Objects (Sở hữu các object lớp dưới)
-    SocketCanTransport* transport;
-    UdsClient* client;
+    //SocketCanTransport* transport;
+    UdsClient* m_pUDSClient;
 
     // Threading Management
     std::thread workerThread;      // Luồng xử lý công việc nặng

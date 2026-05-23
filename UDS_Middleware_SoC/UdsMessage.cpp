@@ -22,16 +22,14 @@ void UdsMessage::appendBytes(const std::vector<uint8_t>& bytes) {
 }
 
 // Quan trọng: Đóng gói SID và Payload thành một dòng dữ liệu liền mạch
-std::vector<uint8_t> UdsMessage::getRawBytes() const {
+std::vector<uint8_t> UdsMessage::getRawBytes() const 
+{
     std::vector<uint8_t> raw;
-
     // Tối ưu: Dự trù trước bộ nhớ để tránh cấp phát nhiều lần
     // Kích thước = 1 byte SID + kích thước payload hiện tại
     raw.reserve(1 + payload.size());
-
     // 1. Đưa SID vào đầu tiên
     raw.push_back(sid);
-
     // 2. Đưa toàn bộ payload vào sau
     raw.insert(raw.end(), payload.begin(), payload.end());
 

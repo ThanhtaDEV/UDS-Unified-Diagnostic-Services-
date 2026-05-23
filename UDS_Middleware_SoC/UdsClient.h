@@ -32,9 +32,9 @@ private:
     int p2_timeout;
 
     // QUẢN LÝ TRANH CHẤP TÀI NGUYÊN BUS CAN
-    //std::mutex m_busAccessMutex;
-    //std::condition_variable m_busAvailabilityCv;
-    //bool is_fota_locked;	// Cờ đánh dấu FOTA đang chiếm dụng bus
+    std::mutex m_busAccessMutex;
+    std::condition_variable m_busAvailabilityCv;
+    bool is_fota_locked;	// Cờ đánh dấu FOTA đang chiếm dụng bus
 
     // HELPER FUNCTION (IMPORTANT)
     // Hàm tách số 32-bit thành 4 byte để đẩy vào vector (dùng cho Address & Size)
@@ -60,12 +60,12 @@ public:
     /**
      * @brief Khóa Bus CAN để chạy FOTA. Các luồng khác gọi sendAndWait sẽ bị ru ngủ sâu.
      */
-    //void lockForFota();
+    void lockForFOTA();
 
     /**
      * @brief Nhả Bus CAN sau khi FOTA xong. Đánh thức các luồng đang ngủ (Diag) dậy.
      */
-    //void unlockFota();
+    void unlockFOTA();
 
     // =============================
     // CÁC DỊCH VỤ CƠ BẢN (UDS APIs)
@@ -109,14 +109,14 @@ public:
      * @param statusMask Mặt nạ lỗi (Ví dụ: 0x09 cho Active faults)
      * @return UdsResponse Chứa payload chứa số lượng lỗi
      */
-    //UdsResponse readDTCCount(uint8_t statusMask = 0x09);
+    UdsResponse readDTCCount(uint8_t statusMask = 0x09);
 
     /**
      * @brief Service 0x19 0x02: Lấy danh sách chi tiết các mã lỗi
      * @param statusMask Mặt nạ lỗi (Ví dụ: 0x09 cho Active faults)
      * @return UdsResponse Chứa chuỗi các byte DTC (3 byte) và Status (1 byte)
      */
-    //UdsResponse readDTCList(uint8_t statusMask = 0x09);
+    UdsResponse readDTCList(uint8_t statusMask = 0x09);
 
     /**
      * @brief Service 0x19 0x04: Đọc Snapshot (dữ liệu đóng băng) của 1 lỗi cụ thể
@@ -124,14 +124,14 @@ public:
      * @param recordNumber Số thứ tự bản ghi (Mặc định 0x01)
      * @return UdsResponse Dữ liệu môi trường lúc xảy ra lỗi
      */
-    //UdsResponse readDTCSnapshot(uint32_t dtc, uint8_t recordNumber = 0x01);
+    UdsResponse readDTCSnapshot(uint32_t dtc, uint8_t recordNumber = 0x01);
 
     /**
      * @brief Service 0x14: Xóa toàn bộ mã lỗi trên VCU
      * @param groupOfDTC Nhóm lỗi cần xóa (Mặc định 0xFFFFFF là xóa tất cả)
      * @return UdsResponse
      */
-    //UdsResponse clearDiagnosticInformation(uint32_t groupOfDTC = 0xFFFFFF);
+    UdsResponse clearDiagnosticInformation(uint32_t groupOfDTC = 0xFFFFFF);
 
 };
 

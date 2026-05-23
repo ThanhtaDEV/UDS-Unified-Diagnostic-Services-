@@ -10,10 +10,16 @@
 #include <fstream>
 #include <curl/curl.h>
 
+#include <nlohmann/json.hpp>
+#include <iomanip> 		// format số Hex
+#include <sstream>
+
 #include "FOTA_Manager.h"
+#include "RemoteDiag_Manager.h"
 
 namespace fs = std::filesystem;
 using namespace std;
+using json = nlohmann::json;
 
 // =================================================
 // 1. KHÔNG GIAN ĐỒNG BỘ HÓA (SYNCHRONIZATION SPACE)
@@ -31,6 +37,9 @@ std::condition_variable g_aiCv;
 
 // Trỏ toàn cục trỏ đến FotaManager (nhận tham sớ init, không nhận object)
 FotaManager* g_fotaManager = nullptr;
+// Biến toàn cục cho Remote Diag
+RemoteDiag_Manager* g_diagManager = nullptr;
+const string DIAG_API = "https://fota.sdv-core.local/api/v1/diagnostics"; // Endpoint nhận lỗi
 
 // Cấu hình thư mục
 const std::string FIRMWARE_DIR = "Firmware/";
@@ -49,12 +58,18 @@ const string DOWNLOAD_API = SERVER_URL + "/api/firmware/latest/";
  * @brief Bắt tín hiệu ngắt từ hệ điều hành
  */
 // Control Application when run underground "Systemctl"
-void signalHandler(int signum) {
+void signalHandler(int signum) 
+{
     std::cout << "[Master] Recived Interrupt Signal " << signum << ". Cleaning up...\n";
     g_keepRunning = false;
     g_aiCv.notify_all(); // Đánh thức AI (nếu nó đang ngủ chờ FOTA) để nó kịp kết thúc luồng
-    if (g_fotaManager) {
+    if (g_fotaManager) 
+    {
         g_fotaManager->stop();
+    }
+    if (g_diagManager) 
+    {
+	g_diagManager->stop();
     }
 }
 
@@ -62,29 +77,35 @@ void signalHandler(int signum) {
  * @brief Đứng chờ FOTA_Manager thực thi xong 1 lệnh UDS
  */
 // Master cần phải chờ Response của một Service rồi mới thực thi Service khác
-void waitFotaStep(FotaManager* fotaApp) {
+void waitFotaStep(FotaManager* fotaApp) 
+{
     // Delay 50ms đợi nhịp CPU để workerThread bên trong fotaApp kịp gán biến isProcessing = true.
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
 
     // Chờ đến lúc workerThread còn đang báo bận. Trễ 100ms/vòng để không ăn CPU.
-    while (fotaApp->isProcessing() && g_keepRunning) {
+    while (fotaApp->isProcessing() && g_keepRunning) 
+    {
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
 }
 
 // HELPERS CHO CÁC TÁC VỤ WEB & FILE
-size_t WriteStringCallback(void *contents, size_t size, size_t nmemb, string *userp) {
+size_t WriteStringCallback(void *contents, size_t size, size_t nmemb, string *userp) 
+{
     userp->append((char*)contents, size * nmemb);
     return size * nmemb;
 }
 
-size_t WriteFileCallback(void *ptr, size_t size, size_t nmemb, FILE *stream) {
+size_t WriteFileCallback(void *ptr, size_t size, size_t nmemb, FILE *stream) 
+{
     return fwrite(ptr, size, nmemb, stream);
 }
 
-string getLocalFilename() {
+string getLocalFilename() 
+{
     ifstream file(LAST_FILE_TXT);
-    if (file.is_open()) {
+    if (file.is_open()) 
+    {
         string filename;
         getline(file, filename);
         file.close();
@@ -93,15 +114,18 @@ string getLocalFilename() {
     return "";
 }
 
-void updateLocalFilename(const string& filename) {
+void updateLocalFilename(const string& filename)
+{
     ofstream file(LAST_FILE_TXT);
-    if (file.is_open()) {
+    if (file.is_open()) 
+    {
         file << filename;
         file.close();
     }
 }
 
-string extractJsonValue(const string& json, const string& key) {
+string extractJsonValue(const string& json, const string& key) 
+{
     string searchKey = "\"" + key + "\": \"";
     size_t start = json.find(searchKey);
     if (start == string::npos) return "";
@@ -139,50 +163,56 @@ void aiWorkerThread() {
 // ======================================================
 // 4. LUỒNG TÁC VỤ 2: QUÉT SERVER TRỰC TUYẾN (WEB POLLER)
 // ======================================================
-void webPollerThread() {
+void webPollerThread() 
+{
     std::cout << "[Web Poller] Starting server monitoring: " << SERVER_URL << "\n";
     if (!fs::exists(FIRMWARE_DIR)) fs::create_directory(FIRMWARE_DIR);
-    while (g_keepRunning) {
-	// Sleep ngay lập tức nếu FOTA Flashing
-	{
+    while (g_keepRunning) 
+    {
+        // Sleep ngay lập tức nếu FOTA Flashing
+        {
             std::unique_lock<std::mutex> lock(g_aiWaitMutex);
             g_aiCv.wait(lock, []{ return !g_fotaInProgress.load() || !g_keepRunning.load(); });
         }
         if (!g_keepRunning) break;
 
-	string local_filename = getLocalFilename();
+	    string local_filename = getLocalFilename();
         CURL *curl = curl_easy_init();
 
-	if (curl) {
+        if (curl) 
+        {
             string readBuffer;
             curl_easy_setopt(curl, CURLOPT_URL, CHECK_API.c_str());
             curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteStringCallback);
             curl_easy_setopt(curl, CURLOPT_WRITEDATA, &readBuffer);
             curl_easy_setopt(curl, CURLOPT_TIMEOUT, 5L);
 
-	    // [NẠP CHÌA KHÓA mTLS TỪ KÉT SẮT]
-	    // 1. Xác minh Server bằng Root CA
-	    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 1L);
-	    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 2L); // Ép kiểm tra tên miền
-	    curl_easy_setopt(curl, CURLOPT_CAINFO, "/etc/fota_keys/rootCA.crt");
+            // [NẠP CHÌA KHÓA mTLS TỪ KÉT SẮT]
+            // 1. Xác minh Server bằng Root CA
+            curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 1L);
+            curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 2L); // Ép kiểm tra tên miền
+            curl_easy_setopt(curl, CURLOPT_CAINFO, "/etc/fota_keys/rootCA.crt");
 
-	    // 2.Trình Certification và Private Key của Pi cho Server
-	    curl_easy_setopt(curl, CURLOPT_SSLCERT, "/etc/fota_keys/pi_client.crt");
-	    curl_easy_setopt(curl, CURLOPT_SSLKEY, "/etc/fota_keys/pi_client.key");
+            // 2.Trình Certification và Private Key của Pi cho Server
+            curl_easy_setopt(curl, CURLOPT_SSLCERT, "/etc/fota_keys/pi_client.crt");
+            curl_easy_setopt(curl, CURLOPT_SSLKEY, "/etc/fota_keys/pi_client.key");
 
-	    // Check Log mTLS
-	    curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
+            // Check Log mTLS
+            curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
 
-	    // 3. Khai báo định dạng file
-	    curl_easy_setopt(curl, CURLOPT_SSLCERTTYPE, "PEM");
+            // 3. Khai báo định dạng file
+            curl_easy_setopt(curl, CURLOPT_SSLCERTTYPE, "PEM");
             curl_easy_setopt(curl, CURLOPT_SSLKEYTYPE, "PEM");
 
+            // NHIỆM VỤ 1: CHECK VÀ DOWNLOAD FIRMWARE
             CURLcode res = curl_easy_perform(curl);
-	    // Kiểm tra có file mới không
-            if (res == CURLE_OK && readBuffer.find("\"has_firmware\": true") != string::npos) {
+	        // Kiểm tra có file mới không
+            if (res == CURLE_OK && readBuffer.find("\"has_firmware\": true") != string::npos) 
+            {
                 string latest_filename = extractJsonValue(readBuffer, "filename");
 
-                if (latest_filename != local_filename && !latest_filename.empty()) {
+                if (latest_filename != local_filename && !latest_filename.empty()) 
+                {
                     cout << "\n[Web Poller] NEW FILE DETECTED ON SERVER: " << latest_filename << endl;
 
                     // [AN TOÀN FILE]: Đặt đuôi .tmp để FOTA Thread không nhìn thấy
@@ -190,23 +220,27 @@ void webPollerThread() {
                     string final_path = FIRMWARE_DIR + latest_filename;
 
                     FILE *fp = fopen(tmp_path.c_str(), "wb");
-                    if (fp) {
+                    if (fp) 
+                    {
                         cout << "[Web Poller] Downloading..." << endl;
                         curl_easy_setopt(curl, CURLOPT_URL, DOWNLOAD_API.c_str());
                         curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteFileCallback);
                         curl_easy_setopt(curl, CURLOPT_WRITEDATA, fp);
                         curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
 
-			// Gọi lại curl_easy_perform, libcurl sẽ TỰ ĐỘNG tái sử dụng cấu hình mTLS
+			            // Gọi lại curl_easy_perform, libcurl sẽ TỰ ĐỘNG tái sử dụng cấu hình mTLS
                         res = curl_easy_perform(curl);
                         fclose(fp);
 
-                        if (res == CURLE_OK) {
+                        if (res == CURLE_OK) 
+                        {
                             // Tải xong 100%, đổi tên .tmp thành .zip
                             fs::rename(tmp_path, final_path);
                             cout << "[Web Poller] DOWNLOAD SUCCESSFUL! Renamed to: " << final_path << endl;
                             updateLocalFilename(latest_filename);
-                        } else {
+                        } 
+                        else 
+                        {
                             // Tải lỗi (rớt mạng) -> Xóa file rác
                             fs::remove(tmp_path);
                             cerr << "[Web Poller] Download error: " << curl_easy_strerror(res) <<". Will retry later." << endl;
@@ -214,164 +248,253 @@ void webPollerThread() {
                     }
                 }
             }
-	    else if (res != CURLE_OK) {
-		// In ra nguyên nhân mTLS thất bại (debug)
-                cerr << "[Web Poller] TLS Handshake / API Check failed: " << curl_easy_strerror(res) << endl;
-	    }
+            else if (res != CURLE_OK) 
+            {
+            // In ra nguyên nhân mTLS thất bại (debug)
+                    cerr << "[Web Poller] TLS Handshake / API Check failed: " << curl_easy_strerror(res) << endl;
+            }
+
+            // NHIỆM VỤ 2: LẤY LỖI DTC VÀ ĐẨY LÊN CLOUD [Json]
+            std::vector<DTCRecord> stLocalDTCList;
+            // Lấy dữ liệu an toàn từ Diag Manager
+            if (res == CURLE_OK && g_diagManager != nullptr && g_diagManager->Dem_GetActiveDTCList(stLocalDTCList))
+            {
+                // Đóng gói JSON
+                json payload_json;
+                payload_json["vehicle_id"] = "TOYOTA_STM32_DEMO_01"; 
+                payload_json["diagnostic_data"]["dtc_count"] = stLocalDTCList.size();
+
+                json active_dtcs = json::array();
+                for (const auto& dtc : stLocalDTCList)
+                {
+                    json single_dtc;
+                    char hexStr[10];
+                    snprintf(hexStr, sizeof(hexStr), "%06X", dtc.dtcCode);
+                    single_dtc["code"] = hexStr;
+                    single_dtc["status_hex"] = dtc.status;
+
+                    if (dtc.status & 0x08) single_dtc["status_flags"].push_back("CONFIRMED_DTC");
+                    if (dtc.status & 0x01) single_dtc["status_flags"].push_back("TEST_FAILED");
+
+                    active_dtcs.push_back(single_dtc);
+                }
+                payload_json["diagnostic_data"]["active_dtcs"] = active_dtcs;
+                string post_data = payload_json.dump();
+
+                // Chuyển CURL sang mode HTTP POST
+                curl_easy_setopt(curl, CURLOPT_URL, DIAG_API.c_str());
+                curl_easy_setopt(curl, CURLOPT_POST, 1L);
+                curl_easy_setopt(curl, CURLOPT_POSTFIELDS, post_data.c_str());
+
+                // Thêm Header Content-Type: application/json
+                struct curl_slist* headers = NULL;
+                headers = curl_slist_append(headers, "Content-Type: application/json");
+                curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+
+                // Chuẩn bị buffer mới để nhận câu trả lời từ API nhận lỗi
+                string diagReadBuffer;
+                curl_easy_setopt(curl, CURLOPT_WRITEDATA, &diagReadBuffer);
+
+                // Push POST lên server (Key mTLS vẫn nằm trong curl handle)
+                CURLcode diagRes = curl_easy_perform(curl);
+
+                if (diagRes == CURLE_OK) 
+                {
+                    std::cout << "[Web Poller] Pushed " << stLocalDTCList.size() 
+                              << " DTC(s). Server replied: " << diagReadBuffer << "\n";
+                } 
+                else 
+                {
+                    std::cerr << "[Web Poller] Failed to push DTCs: " << curl_easy_strerror(diagRes) << "\n";
+                }
+
+                // Dọn dẹp header và trả curl về trạng thái mặc định (GET) để vòng lặp sau check FOTA không bị lỗi
+                curl_slist_free_all(headers);
+                curl_easy_setopt(curl, CURLOPT_POST, 0L); 
+                curl_easy_setopt(curl, CURLOPT_HTTPGET, 1L);
+            }
+            // Kết thúc 1 Chu kỳ
             curl_easy_cleanup(curl);
         }
-
-        std::this_thread::sleep_for(std::chrono::seconds(5));
+        std::this_thread::sleep_for(std::chrono::seconds(10)); // 10s đi check DTCList và gửi Json
     }
 }
 
 // ==============================
 // 5. LUỒNG TÁC VỤ 3: FOTA DAEMON
 // ==============================
-void fotaWorkerThread(FotaManager* fotaApp) {
+void fotaWorkerThread(FotaManager* fotaApp) 
+{
     std::cout << "[FOTA Worker] Starting automatic Monitoring...\n";
 
-    if(!fs::exists(FIRMWARE_DIR)) {
-	fs::create_directory(FIRMWARE_DIR);
+    if(!fs::exists(FIRMWARE_DIR)) 
+    {
+	    fs::create_directory(FIRMWARE_DIR);
     }
 
-    while(g_keepRunning) {
-	std::string zipPath = ""; // Biến lưu đường dẫn chứa package .zip
+    while(g_keepRunning) 
+    {
+        std::string zipPath = ""; // Biến lưu đường dẫn chứa package .zip
 
-	for (const auto& entry : fs::directory_iterator(FIRMWARE_DIR)) {
-	    if (entry.is_regular_file()) {
-		// Nếu đuôi Folder chính xác là ".zip" thì lấy
-		if (entry.path().extension() == ".zip") {
-		    zipPath = entry.path().string();
-                    break; // Tìm thấy 1 file là thoát vòng lặp quét ngay
-		}
-	    }
-	}
+        for (const auto& entry : fs::directory_iterator(FIRMWARE_DIR)) 
+        {
+            if (entry.is_regular_file()) 
+            {
+                // Nếu đuôi Folder chính xác là ".zip" thì lấy
+                if (entry.path().extension() == ".zip") 
+                {
+                    zipPath = entry.path().string();
+                            break; // Tìm thấy 1 file là thoát vòng lặp quét ngay
+                }
+            }
+        }
 
-	// Quét file thời gian thực. Download Package .tmp khi done thì .zip
-	if (!zipPath.empty()) {
-	    std::cout << "[FOTA Worker] NEW FIRMWARE [.ZIP] PACKAGE DETECTED: " << zipPath << std::endl;;
+        // Quét file thời gian thực. Download Package .tmp khi done thì .zip
+        if (!zipPath.empty()) 
+        {
+            std::cout << "[FOTA Worker] NEW FIRMWARE [.ZIP] PACKAGE DETECTED: " << zipPath << std::endl;;
 
-	    // Đảm bảo AI chạy khung data final và bị locked
-	    g_fotaInProgress = true;
-            std::this_thread::sleep_for(std::chrono::milliseconds(600));
-	    bool isFotaSuccess = true; // Cờ theo dõi cả quá trình FOTA
+            // Đảm bảo AI chạy khung data final và bị locked
+            g_fotaInProgress = true;
+                std::this_thread::sleep_for(std::chrono::milliseconds(600));
+            bool isFotaSuccess = true; // Cờ theo dõi cả quá trình FOTA
 
-	    // lock_guard sẽ tự động lock g_canMutex khi vào và unlock khi ra
-	    {
-	        std::lock_guard<std::mutex> canLock(g_canMutex);
+            fotaApp->lockBusForProgramming();
+            std::cout << "[FOTA Worker] Starting upload to VCU...\n";
+
+            // lock_guard sẽ tự động lock g_canMutex khi vào và unlock khi ra
+            {
+                std::lock_guard<std::mutex> canLock(g_canMutex);
                 std::cout << "[FOTA Worker] Starting upload to VCU...\n";
 
-	        // Bước 1: SESSION CONTROL - 0x10
-	        fotaApp->startSessionProcess();
-	        waitFotaStep(fotaApp);
-	        // Ngắt lệnh (isFotaSuccess = false) nếu VCU reject
-	        if (!fotaApp->getTaskResult()) {
+                // Bước 1: SESSION CONTROL - 0x10
+                fotaApp->startSessionProcess();
+                waitFotaStep(fotaApp);
+                // Ngắt lệnh (isFotaSuccess = false) nếu VCU reject
+                if (!fotaApp->getTaskResult()) 
+                {
                     std::cerr << "[Master] ABORT: Programming Session Error.\n";
                     isFotaSuccess = false;
                 }
 
-	        // Bước 2: SERCURITY ACCESS - 0x27
-	        if (isFotaSuccess) {
+                // Bước 2: SERCURITY ACCESS - 0x27
+                if (isFotaSuccess) 
+                {
                     fotaApp->startSecurityProcess();
                     waitFotaStep(fotaApp);
-                    if (!fotaApp->getTaskResult()) {
-		        std::cerr << "[Master] ABORT: Security Access Error.\n";
+                    if (!fotaApp->getTaskResult()) 
+                    {
+                        std::cerr << "[Master] ABORT: Security Access Error.\n";
                         isFotaSuccess = false;
                     }
                 }
 
-	        // Bước 3: REQUEST DOWNLOAD - 0x34
-	        if (isFotaSuccess) {
-		    fotaApp->startRequestDownloadProcess(zipPath);
-		    waitFotaStep(fotaApp);
-		    if (!fotaApp->getTaskResult()) {
-		        std::cerr << "[Master] ABORT: Service 0x34 Error or Invalid Firmware file.\n";
+                // Bước 3: REQUEST DOWNLOAD - 0x34
+                if (isFotaSuccess) 
+                {
+                    fotaApp->startRequestDownloadProcess(zipPath);
+                    waitFotaStep(fotaApp);
+                    if (!fotaApp->getTaskResult()) 
+                    {
+                        std::cerr << "[Master] ABORT: Service 0x34 Error or Invalid Firmware file.\n";
                         isFotaSuccess = false;
-		    }
-	        }
+                    }
+                }
 
-	        // Bước 4: TRANSFER DATA - 0x36
-	        if (isFotaSuccess) {
-		    fotaApp->startTransferDataProcess();
-		    waitFotaStep(fotaApp);
-		    if (!fotaApp->getTaskResult()) {
-		        std::cerr << "[Master] ABORT: Connection lost during Data Transfer (0x36).\n";
-		        isFotaSuccess = false;
-		    }
-	        }
+                // Bước 4: TRANSFER DATA - 0x36
+                if (isFotaSuccess) 
+                {
+                    fotaApp->startTransferDataProcess();
+                    waitFotaStep(fotaApp);
+                    if (!fotaApp->getTaskResult()) 
+                    {
+                        std::cerr << "[Master] ABORT: Connection lost during Data Transfer (0x36).\n";
+                        isFotaSuccess = false;
+                    }
+                }
 
-	        // Bước 5: TRANSFER EXIT - 0x37
-	        if (isFotaSuccess) {
-		    fotaApp->startTransferExitProcess();
-		    waitFotaStep(fotaApp);
-		    if (!fotaApp->getTaskResult()) {
-		        std::cerr << "[Master] ABORT: Service 0x37 failed. Hardware CRC mismatch.\n";
-		        isFotaSuccess = false;
-		    }
-		}
+                // Bước 5: TRANSFER EXIT - 0x37
+                if (isFotaSuccess) 
+                {
+                    fotaApp->startTransferExitProcess();
+                    waitFotaStep(fotaApp);
+                    if (!fotaApp->getTaskResult()) 
+                    {
+                        std::cerr << "[Master] ABORT: Service 0x37 failed. Hardware CRC mismatch.\n";
+                        isFotaSuccess = false;
+                    }
+                }
 
-	        // Bước 6: RESET ECU - 0x11
-	        // FOTA thất bại (Firmware Error or mode Bootloader) Reset RollBack Active Bank
-	        std::cout << "[FOTA Worker] Resetting VCU to complete session...\n";
-	        fotaApp->startResetProcess();
+                // Bước 6: RESET ECU - 0x11
+                // FOTA thất bại (Firmware Error or mode Bootloader) Reset RollBack Active Bank
+                std::cout << "[FOTA Worker] Resetting VCU to complete session...\n";
+                fotaApp->startResetProcess();
                 waitFotaStep(fotaApp);
-	    }
+            }
 
-	    // Xử lý vòng đời File, .done or .error (tránh while(1) khi thấy .zip)
-	    std::string newPath = zipPath + (isFotaSuccess ? ".done" : ".error");
-	    try {
-	        fs::rename(zipPath, newPath);
-	        std::cout << "[FOTA Worker] Finalized OTA file to: " << newPath << "\n";
-	    }
-	    catch (const fs::filesystem_error& e) {
-	        std::cerr << "[FOTA Worker] Permission error while renaming file: " << e.what() << '\n';
-	    }
+            // Xử lý vòng đời File, .done or .error (tránh while(1) khi thấy .zip)
+            std::string newPath = zipPath + (isFotaSuccess ? ".done" : ".error");
+            try 
+            {
+                fs::rename(zipPath, newPath);
+                std::cout << "[FOTA Worker] Finalized OTA file to: " << newPath << "\n";
+            }
+            catch (const fs::filesystem_error& e) 
+            {
+                std::cerr << "[FOTA Worker] Permission error while renaming file: " << e.what() << '\n';
+            }
 
-	    // FOTA done. Đánh thức Thread AI
-	    std::cout << "[FOTA Worker] Process complete. Waking up AI thread...\n";
-	    g_fotaInProgress = false;
-	    g_aiCv.notify_all();
+            // FOTA done. Đánh thức Thread AI
+            std::cout << "[FOTA Worker] Process complete. Waking up AI thread...\n";
+            g_fotaInProgress = false;
+            fotaApp->unlockBusFromProgramming(); // Mở khóa UdsClient
+            g_aiCv.notify_all();
         }
-	// Thread FOTA ngủ 3s (tránh while(1)) chạy liên tục tốn CPU
-	std::this_thread::sleep_for(std::chrono::seconds(3));
+        // Thread FOTA ngủ 3s (tránh while(1)) chạy liên tục tốn CPU
+        std::this_thread::sleep_for(std::chrono::seconds(3));
     }
 }
 
 // =============================
 // 6. TRUNG TÂM KHỞI CHẠY (MAIN)
 // =============================
-int main(int argc, char* argv[]) {
+int main(int argc, char* argv[]) 
+{
     // Đăng ký bắt cờ tín hiệu từ Hệ điều hành
     signal(SIGINT, signalHandler);  // Bắt Ctrl+C (Khi debug)
     signal(SIGTERM, signalHandler); // Bắt lệnh kill từ systemctl (Khi chạy Production)
 
     std::cout << "[SoC DAEMON] AUTOMOTIVE FOTA & AI CONTROL CENTER \n";
 
-    FotaManager fotaApp;
+    // 1. Hạ tầng giao tiếp dùng chung (SHARE INFRASTRUCTURE)
+    SocketCanTransport can0("can0", 0x7E0, 0x7E8); // khởi tạo vật lý
+    UdsClient sharedUDSClient(&can0, nullptr, 1000); // Midleware bao CAN lại
+
+    // 2. Khởi tạo các Application
+    FotaManager fotaApp(&sharedUDSClient);
     g_fotaManager = &fotaApp;
 
-    // Khởi tạo hạ tầng mạng. (SocketCAN)
-    if (!fotaApp.initialize("can0", 0x7E0, 0x7E8)) {
-        std::cerr << "[Master] CAN Network Error. System cannot start.\n";
-        return -1;
-    }
+    RemoteDiag_Manager diagApp(&sharedUDSClient, 20000); // Quét 5p/lần 300000
+    g_diagManager = &diagApp;
 
-    // luồng AI và luồng FOTA chạy song song ở chế độ nền.
+    // 3. Khởi chạy các Thread
     //std::thread aiThread(aiWorkerThread);
     std::thread fotaThread(fotaWorkerThread, &fotaApp);
     std::thread webThread(webPollerThread);
+    diagApp.start();
 
-    // Luồng chính (main) lui về hậu trường, ngủ yên ở đây để giữ cho chương trình sống.
+    // Luồng chính (main) ngủ yên để giữ cho chương trình sống.
     // Nếu main() thoát, toàn bộ app sẽ bị hủy.
-    while (g_keepRunning) {
+    while (g_keepRunning) 
+    {
         std::this_thread::sleep_for(std::chrono::seconds(1));
     }
 
-    // Khi hệ thống nhận lệnh tắt, dùng join() đợi các luồng phụ dọn dẹp xong
+    // 4. Khi hệ thống nhận lệnh tắt, dùng join() đợi các luồng phụ dọn dẹp xong
     //if (aiThread.joinable()) aiThread.join();
     if (fotaThread.joinable()) fotaThread.join();
     if (webThread.joinable()) webThread.join();
+    // Luồng Diag tự join() bên trong hàm stop()
 
     std::cout << "[Master] Application Exited Successfully.\n";
     return 0;
