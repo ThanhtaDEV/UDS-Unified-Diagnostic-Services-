@@ -89,15 +89,13 @@ void waitFotaStep(FotaManager* fotaApp)
     }
 }
 
-// HELPERS CHO CÁC TÁC VỤ WEB & FILE
-size_t WriteStringCallback(void *contents, size_t size, size_t nmemb, string *userp) 
-{
-    userp->append((char*)contents, size * nmemb);
+// Heaper cho Web và File
+static size_t WriteStringCallback(void *contents, size_t size, size_t nmemb, void *userp) {
+    ((std::string*)userp)->append((char*)contents, size * nmemb);
     return size * nmemb;
 }
-
-size_t WriteFileCallback(void *ptr, size_t size, size_t nmemb, FILE *stream) 
-{
+// Hàm hứng File tải về (Chắc chắn bạn đang có sẵn hàm này rồi)
+static size_t WriteFileCallback(void *ptr, size_t size, size_t nmemb, FILE *stream) {
     return fwrite(ptr, size, nmemb, stream);
 }
 
@@ -160,6 +158,7 @@ void aiWorkerThread() {
 }
 */
 
+
 // ======================================================
 // 4. LUỒNG TÁC VỤ 2: QUÉT SERVER TRỰC TUYẾN (WEB POLLER)
 // ======================================================
@@ -167,6 +166,11 @@ void webPollerThread()
 {
     std::cout << "[Web Poller] Starting server monitoring: " << SERVER_URL << "\n";
     if (!fs::exists(FIRMWARE_DIR)) fs::create_directory(FIRMWARE_DIR);
+
+    // Biến lưu trạng thái cũ để so sánh chống Spam
+    std::vector<DTCRecord> stPreviousDTCList;
+    bool isFirstRun = true;
+
     while (g_keepRunning) 
     {
         // Sleep ngay lập tức nếu FOTA Flashing
@@ -259,6 +263,8 @@ void webPollerThread()
             // Lấy dữ liệu an toàn từ Diag Manager
             if (res == CURLE_OK && g_diagManager != nullptr && g_diagManager->Dem_GetActiveDTCList(stLocalDTCList))
             {
+                    
+                std::cout << "[Web Poller] Detect DTC Status is Changed ! Loading JSON\n";
                 // Đóng gói JSON
                 json payload_json;
                 payload_json["vehicle_id"] = "TOYOTA_STM32_DEMO_01"; 
@@ -293,6 +299,8 @@ void webPollerThread()
 
                 // Chuẩn bị buffer mới để nhận câu trả lời từ API nhận lỗi
                 string diagReadBuffer;
+                // BẮT BUỘC PHẢI KHAI BÁO LẠI HÀM NÀY NẾU KHÔNG SẼ BỊ SEGFAULT:
+                curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteStringCallback); 
                 curl_easy_setopt(curl, CURLOPT_WRITEDATA, &diagReadBuffer);
 
                 // Push POST lên server (Key mTLS vẫn nằm trong curl handle)
@@ -301,7 +309,7 @@ void webPollerThread()
                 if (diagRes == CURLE_OK) 
                 {
                     std::cout << "[Web Poller] Pushed " << stLocalDTCList.size() 
-                              << " DTC(s). Server replied: " << diagReadBuffer << "\n";
+                            << " DTC(s). Server replied: " << diagReadBuffer << "\n";
                 } 
                 else 
                 {
