@@ -6,20 +6,6 @@
 
 #IncludeRegexTransform: 
 
-/home/thanh/UDS_Services/UDS_Middleware_SoC/FOTA_Manager.cpp
-FOTA_Manager.h
-/home/thanh/UDS_Services/UDS_Middleware_SoC/FOTA_Manager.h
-chrono
--
-UdsConstants.h
-/home/thanh/UDS_Services/UDS_Middleware_SoC/UdsConstants.h
-fstream
--
-zlib.h
--
-nlohmann/json.hpp
--
-
 /home/thanh/UDS_Services/UDS_Middleware_SoC/FOTA_Manager.h
 iostream
 -
@@ -78,12 +64,6 @@ FOTA_Manager.h
 RemoteDiag_Manager.h
 /home/thanh/UDS_Services/UDS_Middleware_SoC/RemoteDiag_Manager.h
 
-/home/thanh/UDS_Services/UDS_Middleware_SoC/RemoteDiag_Manager.cpp
-RemoteDiag_Manager.h
-/home/thanh/UDS_Services/UDS_Middleware_SoC/RemoteDiag_Manager.h
-chrono
--
-
 /home/thanh/UDS_Services/UDS_Middleware_SoC/RemoteDiag_Manager.h
 UdsClient.h
 /home/thanh/UDS_Services/UDS_Middleware_SoC/UdsClient.h
@@ -106,16 +86,6 @@ string
 vector
 -
 cstdint
--
-
-/home/thanh/UDS_Services/UDS_Middleware_SoC/UdsClient.cpp
-UdsClient.h
-/home/thanh/UDS_Services/UDS_Middleware_SoC/UdsClient.h
-UdsConstants.h
-/home/thanh/UDS_Services/UDS_Middleware_SoC/UdsConstants.h
-iostream
--
-iomanip
 -
 
 /home/thanh/UDS_Services/UDS_Middleware_SoC/UdsClient.h
@@ -142,16 +112,6 @@ UdsConstants.h
 
 /home/thanh/UDS_Services/UDS_Middleware_SoC/UdsConstants.h
 cstdint
--
-
-/home/thanh/UDS_Services/UDS_Middleware_SoC/UdsException.cpp
-UdsException.h
-/home/thanh/UDS_Services/UDS_Middleware_SoC/UdsException.h
-UdsConstants.h
-/home/thanh/UDS_Services/UDS_Middleware_SoC/UdsConstants.h
-sstream
--
-iomanip
 -
 
 /home/thanh/UDS_Services/UDS_Middleware_SoC/UdsException.h
